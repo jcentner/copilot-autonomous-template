@@ -36,8 +36,8 @@ def main():
         for line in content.splitlines():
             stripped = line.strip().lower()
             if "**phase status**:" in stripped:
-                if "complete" in stripped or "vision expansion" in stripped:
-                    # Phase is done or waiting for human — allow stop
+                if "complete" in stripped or "blocked" in stripped:
+                    # Phase is done or blocked (incl. vision expansion) — allow stop
                     json.dump({}, sys.stdout)
                     return
 

@@ -75,6 +75,7 @@ Manual overrides: /phase-plan  /implementation-plan  /implement  /code-review  /
 - **Custom agents** (`.agent.md`) — persistent personas with tool restrictions and handoffs. Selected in the agent picker.
 - **Instruction files** (`.instructions.md`) — applied automatically when Copilot works on matching files.
 - **Hooks** (`.github/hooks/`) — deterministic shell commands at agent lifecycle points (e.g., Stop hook blocks premature stopping).
+- **Skills** (`.github/skills/`) — technology-specific knowledge that Copilot auto-loads when relevant. Created by the autonomous builder for each stack technology.
 - **AGENTS.md** — cross-agent instructions recognized by Copilot, Claude Code, and other AI agents.
 - Markdown links in prompt/agent bodies **auto-attach referenced files as context**.
 - Prompts link to `copilot-instructions.md` for shared project context.

@@ -6,10 +6,12 @@
 
 - **Language**: {{ language }}
 - **Checkpoint file**: `roadmap/CURRENT-STATE.md` — read this first every session
-- **Vision lock**: `docs/vision/VISION-LOCK.md` — highest-authority document in the repo
+- **Vision lock**: `docs/vision/VISION-LOCK.md` — highest-authority document, **immutable once written**
+- **Vision revisions**: `docs/vision/revisions/` — minor refinements that supplement the vision lock
 - **ADRs**: Record significant decisions in `docs/architecture/decisions/`
 - **Open questions**: Track uncertainty in `docs/reference/open-questions.md`
 - **Tech debt**: Track compromises in `docs/reference/tech-debt.md`
+- **Stack skills**: `.github/skills/` — technology-specific skills that ground agents in official docs
 
 ## Development Workflow
 
@@ -25,12 +27,14 @@ This project uses an autonomous build loop. The agent reads the checkpoint, iden
 
 ## Rules
 
-- Do not modify `docs/vision/VISION-LOCK.md` without human approval
+- **Never edit `docs/vision/VISION-LOCK.md` directly** — it is immutable. Minor refinements go in `docs/vision/revisions/`. A new version requires human approval and replaces the file entirely.
+- Read the vision lock AND all revision files to have the complete vision picture
 - Run tests before committing — never commit broken tests
 - Update docs when code changes affect documented behavior
 - Record new design decisions as ADRs
 - Record compromises in the tech debt tracker
 - New terms go in `docs/reference/glossary.md`
+- When adopting a new technology, create a stack skill in `.github/skills/` before writing implementation code
 
 ## Authority Order (highest first)
 

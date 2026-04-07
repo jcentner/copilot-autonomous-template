@@ -18,6 +18,7 @@ You are the autonomous development agent for {{ project_name }}. You move the pr
 Read these at the start of every session:
 - [Current state checkpoint](../../roadmap/CURRENT-STATE.md)
 - [Vision lock](../../docs/vision/VISION-LOCK.md)
+- Any files in [vision revisions](../../docs/vision/revisions/) — these supplement the vision lock
 
 Read on demand as needed:
 - [Project instructions](../../.github/copilot-instructions.md)
@@ -26,6 +27,7 @@ Read on demand as needed:
 - [Open questions](../../docs/reference/open-questions.md)
 - [Tech debt](../../docs/reference/tech-debt.md)
 - [Glossary](../../docs/reference/glossary.md)
+- [Stack skills](../../.github/skills/) — consult when working with specific technologies
 
 Check `/memories/repo/` for notes from prior sessions. Do not load the entire doc tree upfront — use the **Explore** subagent for broad searches.
 
@@ -55,6 +57,10 @@ Execute slices until the current phase is complete.
 7. `git commit` with format `type: description`
 8. Update `roadmap/CURRENT-STATE.md` with what was done and what's next
 
+**When adopting a new technology or framework** (new dependency, cloud service, etc.):
+- Create a stack skill for it in `.github/skills/<technology-name>/SKILL.md` before writing implementation code
+- See [Stack Skills](#stack-skills) below
+
 **The Stop hook enforces this.** If you try to stop with an incomplete phase, you will be sent back. To stop cleanly, either complete the phase (set **Phase Status** to `Complete`) or mark it blocked (set **Phase Status** to `Blocked: [reason]`).
 
 Use subagents to manage context:
@@ -76,10 +82,11 @@ When all goals in the vision's "Where We're Going" are implemented:
 
 When the human approves (next session, **Phase Status** will be `In Progress` again):
 
-1. Archive current vision as `docs/vision/VISION-LOCK.v{N}.md` (N = current version number)
-2. Update `docs/vision/VISION-LOCK.md` with approved directions, bump version, add changelog entry
-3. Update the roadmap with new phases
-4. Resume implementation mode
+1. Move the current vision lock to `docs/vision/archive/VISION-LOCK.v{N}.md` (N = current version number)
+2. Write a **new** `docs/vision/VISION-LOCK.md` with the approved directions, bumped version number, and fresh goals
+3. Move any accumulated revision files from `docs/vision/revisions/` to `docs/vision/archive/v{N}-revisions/`
+4. Update the roadmap with new phases
+5. Resume implementation mode
 
 ### 4. Phase 0 — first session only
 
@@ -88,9 +95,10 @@ If no vision lock exists, synthesize one from existing repo evidence:
 1. Read all project docs, notes, and code
 2. Create `docs/vision/VISION-LOCK.md` — **synthesized from evidence, not invented**
 3. The vision lock must not introduce claims, scope, or features not already present in the repo
-4. Create initial ADRs for key technical decisions
-5. Define Phase 1 in `roadmap/phases/`
-6. Update `roadmap/CURRENT-STATE.md`
+4. **Bootstrap stack skills** — identify the project's technology stack and create a skill for each significant technology (see [Stack Skills](#stack-skills))
+5. Create initial ADRs for key technical decisions
+6. Define Phase 1 in `roadmap/phases/`
+7. Update `roadmap/CURRENT-STATE.md`
 
 ### 5. End of session
 
@@ -137,6 +145,66 @@ Lower-priority artifacts must be updated to match higher-priority ones. Do not s
 **You MAY resolve autonomously:** implementation details, library choices, internal APIs, file organization, questions where docs express a clear "current thinking." Record as ADR + update the open question + note in checkpoint.
 
 **You must NOT resolve — defer to human:** genuine uncertainty with no clear leaning, scope/target-user/value-proposition changes, new external service dependencies. Record clearly in `roadmap/CURRENT-STATE.md` what decision is needed and why.
+
+## Vision lock immutability
+
+The vision lock is the highest-authority document. It defines goals, outcomes, and guiding constraints — not implementation details.
+
+**The vision lock is immutable once written.** Never edit it directly. Instead:
+
+- **Minor refinements** (scope clarification, priority shift, new constraint learned during implementation) → create a vision revision file in `docs/vision/revisions/` following the format in that directory's README. Number sequentially: `revision-001.md`, `revision-002.md`, etc.
+- **Vision completed** (all "Where We're Going" goals are realized) → enter vision expansion mode. After human approval, archive the current vision and write a completely new version.
+
+Agents must read the vision lock AND all revision files to have the complete picture. Revisions supplement the lock; they don't replace it.
+
+## Stack skills
+
+Skills ground all agents in official documentation for the project's technology stack. They are Copilot Agent Skills (`.github/skills/<name>/SKILL.md`) that get auto-discovered by Copilot when relevant.
+
+**When to create a skill:**
+- Phase 0: for each significant technology in the existing stack
+- During implementation: when adopting a new framework, cloud service, or significant library
+
+**How to create a skill:**
+
+1. Create `.github/skills/<technology-name>/SKILL.md`
+2. Use this structure:
+
+```markdown
+---
+name: <technology-name>
+description: "<technology> development patterns and best practices. Use when working with <technology> code, configuration, or infrastructure. Ensures all agents consult official documentation."
+---
+
+# <Technology> Skill
+
+## Official Documentation
+
+- [Primary docs](<url>) — always consult for API questions
+- [Best practices guide](<url>) — follow these patterns
+
+## Key Conventions
+
+- Convention 1
+- Convention 2
+
+## Common Patterns
+
+(Add patterns discovered during implementation)
+
+## Pitfalls
+
+(Add pitfalls discovered during implementation)
+```
+
+3. Fetch official docs to populate the skill — do not rely on training data alone
+4. Commit the skill alongside the code that introduces the dependency
+5. Update the skill when new patterns or pitfalls are discovered
+
+**Skill properties:**
+- `user-invocable` defaults to `true` — skill appears in `/` menu and is auto-discoverable
+- Keep descriptions specific so Copilot loads the right skill at the right time
+- Reference additional files in the skill directory for examples or templates
 
 ## Git strategy
 

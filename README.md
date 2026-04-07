@@ -11,9 +11,10 @@ This template creates a complete `.github/` setup for autonomous development:
 - **Planner subagent** — research and planning with read-only tools + handoff to implement
 - **Tester subagent** — writes tests from specs before seeing implementation (context isolation)
 - **Stop hook** — deterministic enforcement that prevents premature stopping and skipped reviews
+- **Stack skills scaffold** — auto-created skills that ground agents in official docs for each technology
 - **5 manual override prompts** — plan, detail, implement, review, complete
 - **AGENTS.md** — cross-agent instructions (works with Copilot, Claude Code, etc.)
-- **Documentation skeleton** — vision lock, ADRs, open questions, tech debt, glossary
+- **Documentation skeleton** — vision lock (immutable), vision revisions, ADRs, open questions, tech debt, glossary
 - **Roadmap structure** — checkpoint-based cross-session continuity with machine-readable status
 - **Prompt guide** — how to use the workflow (for humans)
 
@@ -47,9 +48,9 @@ copier update
    - `chat.useCustomAgentHooks`: `true` (enables Stop hook)
    - `chat.autopilot.enabled`: `true` (for autonomous sessions)
    - `chat.agent.sandbox`: `true` (safety)
-4. Write your initial vision in `docs/vision/VISION-LOCK.md`
+4. The autonomous builder synthesizes your initial vision into `docs/vision/VISION-LOCK.md`
 5. Select the **autonomous-builder** agent in Copilot Chat
-6. Tell it to start Phase 0 (vision baseline)
+6. Tell it to start Phase 0 (vision baseline + stack skills)
 
 ## Template Variables
 
@@ -76,7 +77,9 @@ The autonomous builder agent runs a continuous loop:
 
 A **Stop hook** (`slice-gate.py`) enforces discipline: the agent cannot stop until the phase is marked complete or explicitly blocked. This prevents premature stopping and skipped reviews.
 
-**Vision expansion gate**: When all vision goals are implemented, the agent proposes new directions and blocks until a human approves the expansion. Vision versions are archived before updates.
+**Skills workflow**: During Phase 0 (and whenever a new technology is adopted), the builder creates Agent Skills in `.github/skills/` that ground all agents in official documentation for each technology in the stack. These are auto-discovered by Copilot when relevant.
+
+**Vision immutability**: The vision lock is written once and never edited. Minor refinements during implementation are tracked as vision revisions in `docs/vision/revisions/`. When the vision is fully realized, the agent proposes new directions and, after human approval, archives the old vision and writes a new version.
 
 Each session is stateless — all cross-session continuity comes from files in the repo and repository memory.
 

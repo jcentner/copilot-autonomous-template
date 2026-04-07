@@ -30,7 +30,14 @@ template/                           # Everything under here gets copied to the t
       implement.prompt.md.jinja     # Execute an implementation plan
       code-review.prompt.md.jinja   # Code review + security audit
       phase-complete.prompt.md.jinja      # Complete a phase, update docs
+    skills/
+      README.md                     # Stack skills convention (verbatim)
   docs/                             # Documentation skeleton (vision, architecture, reference)
+    vision/
+      VISION-LOCK.md.jinja          # Immutable vision lock (goals, outcomes, constraints)
+      revisions/
+        README.md                   # Vision revision format and rules (verbatim)
+      archive/                      # Archived vision versions
   roadmap/                          # Roadmap structure with checkpoint protocol
 ```
 
@@ -52,6 +59,8 @@ template/                           # Everything under here gets copied to the t
 - **Prompt files use `.prompt.md` extension** with YAML frontmatter (`description`, `agent`). Use `${input:variableName}` for runtime user input. Markdown links in prompt bodies auto-attach referenced files as context.
 - **Instruction files use `.instructions.md` extension** with optional `applyTo` glob in frontmatter. Placed in `.github/instructions/`.
 - **AGENTS.md** provides cross-agent instructions recognized by Copilot, Claude Code, and other AI agents.
+- **Vision lock is immutable.** Once written, it is never edited directly. Minor refinements go in `docs/vision/revisions/`. A completed vision is archived and replaced with a new version.
+- **Stack skills** are Agent Skills (`.github/skills/<name>/SKILL.md`) created by the autonomous builder for each technology in the stack. They ground agents in official docs.
 - **No restrictive `tools` list** unless intentionally restricting (e.g., planner agent is read-only by design).
 - **Subagent support**: agents can list allowed subagents in frontmatter `agents:` array. The autonomous-builder uses planner, reviewer, tester, and Explore as subagents.
 - **Handoffs**: agents define `handoffs:` in frontmatter to create transition buttons between agents (e.g., planner → implementation).
