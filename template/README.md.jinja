@@ -1,0 +1,34 @@
+# {{ project_name }}
+
+{{ description }}
+
+## Development
+
+This project uses an AI-assisted autonomous development workflow powered by GitHub Copilot.
+
+### Quick Start
+
+1. Open this repo in VS Code
+2. Ensure GitHub Copilot is active
+3. Open Chat (Ctrl+Shift+I) and select the **autonomous-builder** agent
+4. The agent will read `roadmap/CURRENT-STATE.md` and continue from where it left off
+
+### Manual Development Cycle
+
+Use `/` prompts in Copilot Chat for human-driven development:
+
+```
+/phase-plan → /implementation-plan → /implementation-plan-review → /implement → /code-review → /security-audit → /phase-complete
+```
+
+See [.github/prompts/PROMPT-GUIDE.md](.github/prompts/PROMPT-GUIDE.md) for details.
+
+## Documentation
+
+- [Vision](docs/vision/VISION-LOCK.md)
+- [Architecture](docs/architecture/overview.md)
+- [ADRs](docs/architecture/decisions/)
+- [Open Questions](docs/reference/open-questions.md)
+- [Tech Debt](docs/reference/tech-debt.md)
+- [Glossary](docs/reference/glossary.md)
+- [Roadmap](roadmap/README.md)

@@ -1,0 +1,73 @@
+---
+description: "Create a file-by-file implementation checklist from a phase planning doc."
+agent: agent
+---
+
+# Implementation Plan
+
+You are creating a detailed implementation plan for a {{ project_name }} development phase. Read the project context:
+
+- [Project instructions](../../.github/copilot-instructions.md)
+- [Architecture overview](../../docs/architecture/overview.md)
+- [Open questions](../../docs/reference/open-questions.md)
+
+## Task
+
+Create a file-by-file implementation checklist for: **${input:phasePlanPath}**
+
+Read the phase plan document first.
+
+## Steps
+
+1. **Read the phase plan** thoroughly. Ensure all open questions marked as "must resolve before implementation" have been resolved.
+2. **Analyze the codebase** — search for existing code, patterns, and conventions that this phase needs to integrate with.
+3. **Create the implementation plan** with these sections:
+
+### Implementation Plan Template
+
+```markdown
+# Implementation Plan: Phase N — [Title]
+
+## Prerequisites
+- [ ] Open question OQ-NNN resolved
+- [ ] Dependencies installed/available
+
+## Implementation Order
+(List files/modules in dependency order — implement leaves first)
+
+### 1. [Component/Module Name]
+
+**Files to create/modify:**
+- `path/to/file` — Description of what to create/change
+  - [ ] Step 1: specific task
+  - [ ] Step 2: specific task
+
+**Tests:**
+- `tests/path/to/test_file` — What to test
+  - [ ] Test case 1: description
+  - [ ] Test case 2: description (edge case)
+
+### 2. [Next Component]
+...
+
+## Integration Steps
+- [ ] Step 1: Wire components together
+- [ ] Step 2: End-to-end test
+
+## Verification
+- [ ] All unit tests pass
+- [ ] Integration test passes
+- [ ] Acceptance criteria from phase plan met
+- [ ] No new lint errors introduced
+- [ ] Docs updated if code changed documented behavior
+```
+
+4. **Save** the implementation plan alongside the phase plan (e.g., `roadmap/phases/phase-N-implementation.md`)
+
+## Important
+
+- Be specific about file paths and what each file should contain.
+- Order by dependency — implement foundations before consumers.
+- Include test cases for both happy paths and edge cases.
+- Flag any new open questions or design decisions that surfaced during planning.
+- Do not write any code yet — that's for `/implement`.

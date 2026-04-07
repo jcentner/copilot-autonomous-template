@@ -1,0 +1,67 @@
+---
+description: "Review and update the vision lock to reflect current shipped reality and forward direction."
+agent: agent
+---
+
+# Vision Update
+
+You are updating the {{ project_name }} vision lock to align with reality. The vision lock is the single source of truth for what the project is, what it isn't, what exists, and where it's going.
+
+Read the current state:
+
+- [Vision lock](../../docs/vision/VISION-LOCK.md)
+- [Current state checkpoint](../../roadmap/CURRENT-STATE.md)
+- [Project instructions](../../.github/copilot-instructions.md)
+- [Open questions](../../docs/reference/open-questions.md)
+- [Tech debt](../../docs/reference/tech-debt.md)
+- [ADR index](../../docs/architecture/decisions/README.md)
+
+## Task
+
+Update `docs/vision/VISION-LOCK.md` to reflect reality. Optionally narrow the scope to: **${input:focusArea}**
+
+## Rules
+
+### What belongs in the vision lock
+- Problem statement, target user, core concept
+- Explicit non-goals and out-of-scope items
+- Product and technical constraints
+- Success criteria with current status
+- Architecture invariants
+- "What Exists Today" — a grounded summary of shipped capabilities
+- "Where We're Going" — priority-ordered future directions
+- Risks with current assessment
+- Changelog at the bottom
+
+### What does NOT belong in the vision lock
+- Implementation details (those belong in architecture docs, README, or code)
+- Session-by-session release notes (those belong in CURRENT-STATE.md)
+- Speculative features that haven't been discussed or planned
+
+### Level of abstraction
+The vision is a strategic document. It should be readable by someone unfamiliar with the codebase and give them a clear picture of what the project is, what it can do, what it can't, and where it's headed.
+
+### Evidence standard
+- Every claim in "What Exists Today" must be verifiable by running the code or tests
+- Every item in "Where We're Going" must connect to a real user need or documented gap
+- Success criteria must show honest current status, including failures
+
+### Change protocol
+- Updates are made in-place to the single VISION-LOCK.md file
+- Every substantive change gets a brief changelog entry at the bottom
+- The version number increments (v1.0 → v1.1 for minor, v2.0 for major scope changes)
+
+## Steps
+
+1. **Assess current reality**: Read the checkpoint file. Run tests to verify state. Skim the README.
+2. **Compare to vision**: For each section of the vision lock, check whether claims match reality.
+3. **Update "What Exists Today"**: Match shipped state.
+4. **Update "Where We're Going"**: Add new directions, remove completed ones, re-prioritize.
+5. **Update success criteria status**: Honest assessment of met/unmet/partially met.
+6. **Update risks**: Remove mitigated risks, add new ones discovered through implementation.
+7. **Write changelog entry**: Summarize what changed and why.
+8. **Verify no implementation detail leaked in**: Re-read and strip anything that belongs in architecture docs or README instead.
+
+## Output
+
+Updated `docs/vision/VISION-LOCK.md` with a changelog entry. If significant scope changed, explain the rationale in the chat.

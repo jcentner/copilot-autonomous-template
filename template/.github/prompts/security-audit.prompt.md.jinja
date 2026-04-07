@@ -1,0 +1,72 @@
+---
+description: "Security audit across the codebase."
+agent: agent
+---
+
+# Security Audit
+
+You are performing a security audit of {{ project_name }}. Read the project context:
+
+- [Project instructions](../../.github/copilot-instructions.md)
+- [Architecture overview](../../docs/architecture/overview.md)
+
+## Task
+
+Perform a security audit of the codebase. Focus area (optional): **${input:focusArea:full codebase}**
+
+## Audit Areas
+
+### 1. Dependency Security
+- Run dependency audit tools (npm audit, pip-audit, cargo audit, or equivalent)
+- Check for known vulnerabilities in direct and transitive dependencies
+- Flag outdated dependencies with known CVEs
+
+### 2. Input Validation
+- Check all system boundaries for proper input validation
+- Look for injection vulnerabilities (SQL, command, template, etc.)
+- Verify untrusted data is sanitized before use
+
+### 3. Subprocess Execution
+- Check for command injection in subprocess calls
+- Verify proper shell escaping
+- Ensure user input never reaches shell commands unsanitized
+
+### 4. File System Access
+- Check for path traversal vulnerabilities
+- Verify symlink handling
+- Ensure proper file permissions
+
+### 5. Authentication & Secrets
+- No hardcoded secrets, tokens, or credentials
+- Proper token scoping (minimal permissions)
+- No credential leakage in logs, reports, or error messages
+
+### 6. Data Storage
+- Parameterized queries for all database operations
+- Proper file permissions on data stores
+- No sensitive data stored in plaintext
+
+### 7. External API Interactions
+- Proper authentication handling
+- Rate limiting awareness
+- No SSRF vulnerabilities
+
+## Doc Verification
+
+Before proposing fixes, verify against authoritative documentation:
+- OWASP guidelines for relevant vulnerability classes
+- Language/framework-specific security best practices
+
+Each finding must cite the doc or standard that informed the recommendation.
+
+## Output Format
+
+| Severity | Area | Finding | Evidence | Recommendation | Doc Reference |
+|----------|------|---------|----------|----------------|---------------|
+| Critical/High/Medium/Low | area | description | what you found | how to fix | source |
+
+## Important
+
+- **Do not make changes until the user approves.**
+- Prioritize findings by actual exploitability, not theoretical risk.
+- Consider the deployment model — a local CLI tool has a different threat model than a web service.

@@ -1,0 +1,32 @@
+_min_copier_version: "9.0.0"
+_subdirectory: template
+_templates_suffix: .jinja
+
+project_name:
+  type: str
+  help: "Human-readable project name (e.g., 'My Cool Tool')"
+
+project_slug:
+  type: str
+  default: "{{ project_name | lower | replace(' ', '-') | replace('_', '-') }}"
+  help: "URL/repo-safe slug"
+
+description:
+  type: str
+  help: "One-line project description"
+
+language:
+  type: str
+  choices:
+    Python: Python
+    TypeScript: TypeScript
+    Go: Go
+    Rust: Rust
+    Mixed: Mixed
+  default: Python
+  help: "Primary implementation language"
+
+author:
+  type: str
+  help: "Author name or team"
+  default: ""

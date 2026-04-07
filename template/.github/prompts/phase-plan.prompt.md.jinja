@@ -1,0 +1,66 @@
+---
+description: "Create a phase planning doc with features, dependencies, acceptance criteria, and open questions."
+agent: agent
+---
+
+# Phase Plan
+
+You are planning a new development phase for {{ project_name }}. Read the project context:
+
+- [Project instructions](../../.github/copilot-instructions.md)
+- [Architecture overview](../../docs/architecture/overview.md)
+- [Open questions](../../docs/reference/open-questions.md)
+- [Roadmap](../../roadmap/README.md)
+
+## Task
+
+Create a phase planning document for: **${input:phaseDescription}**
+
+## Steps
+
+1. **Understand scope**: Read the roadmap and existing phase docs to understand where this phase fits.
+2. **Check open questions**: Review `docs/reference/open-questions.md` for any questions relevant to this phase. Flag ones that must be resolved before implementation.
+3. **Check ADRs**: Review `docs/architecture/decisions/` for relevant decisions already made.
+4. **Draft the phase plan** with these sections:
+
+### Phase Plan Template
+
+```markdown
+# Phase N: [Title]
+
+## Status: Planning
+
+## Goal
+One-paragraph description of what this phase accomplishes.
+
+## Features
+- [ ] Feature 1: Description
+- [ ] Feature 2: Description
+
+## Dependencies
+- External tools/libraries needed
+- Previous phases that must be complete
+
+## Open Questions (must resolve before implementation)
+- OQ-NNN: [question] — needs resolution because [reason]
+- New questions discovered during planning
+
+## Acceptance Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Out of Scope
+- What this phase explicitly does NOT include
+
+## Risks
+- Risk 1: [description] — mitigation: [approach]
+```
+
+5. **Save** the phase plan to `roadmap/phases/phase-N-kebab-title.md`
+6. **Update** `roadmap/README.md` to reference the new phase
+
+## Important
+
+- Do not make implementation decisions in the phase plan — that's for `/implementation-plan`.
+- Flag any open questions that need resolution. Add new ones to `docs/reference/open-questions.md`.
+- If this phase requires a new ADR, note it but don't write it yet.

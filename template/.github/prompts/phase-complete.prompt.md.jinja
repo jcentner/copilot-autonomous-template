@@ -1,0 +1,74 @@
+---
+description: "Complete a phase — update docs, record ADRs, record lessons, mark phase done."
+agent: agent
+---
+
+# Phase Complete
+
+You are completing a development phase for {{ project_name }}. Read the project context:
+
+- [Project instructions](../../.github/copilot-instructions.md)
+- [ADR index](../../docs/architecture/decisions/README.md)
+- [Open questions](../../docs/reference/open-questions.md)
+- [Tech debt tracker](../../docs/reference/tech-debt.md)
+- [Glossary](../../docs/reference/glossary.md)
+
+## Task
+
+Complete the phase documented at: **${input:phasePlanPath}**
+
+## Checklist
+
+Work through each step:
+
+### 1. Verify Acceptance Criteria
+- Read the phase plan's acceptance criteria
+- Verify each one is met
+- Note any criteria that were descoped or changed
+
+### 2. Update Phase Plan Status
+- Change status from "In Progress" to "Complete"
+- Note any deviations from the original plan
+- Record completion date
+
+### 3. Record ADRs
+- Were any significant design decisions made during this phase?
+- Create ADRs in `docs/architecture/decisions/` for each
+- Update the ADR index
+
+### 4. Resolve Open Questions
+- Were any open questions from `docs/reference/open-questions.md` answered?
+- Update their status to "Resolved" with the resolution
+- Were new open questions discovered? Add them
+
+### 5. Record Tech Debt
+- Were any shortcuts or compromises made?
+- Add them to `docs/reference/tech-debt.md`
+
+### 6. Update Glossary
+- Were new terms introduced? Add to `docs/reference/glossary.md`
+
+### 7. Check Docs Consistency
+- Do all docs still accurately reflect the codebase after this phase?
+- Specifically check: README, architecture overview
+- Fix any docs-drift introduced during implementation
+
+### 8. Record Lessons Learned
+- What went well?
+- What was harder than expected?
+- What would we do differently next time?
+- Add a "Lessons Learned" section to the phase plan
+
+### 9. Update Roadmap
+- Update `roadmap/README.md` to reflect the completed phase
+- Note any scope changes that affect future phases
+
+## Output
+
+Present a summary:
+- Phase completion status
+- ADRs created
+- Open questions resolved/added
+- Tech debt recorded
+- Docs updated
+- Lessons learned
