@@ -34,9 +34,7 @@ template/                           # Everything under here gets copied to the t
       README.md                     # Stack skills convention (verbatim)
   docs/                             # Documentation skeleton (vision, architecture, reference)
     vision/
-      VISION-LOCK.md.jinja          # Immutable vision lock (goals, outcomes, constraints)
-      revisions/
-        README.md                   # Vision revision format and rules (verbatim)
+      VISION-LOCK.md.jinja          # Versioned vision lock (goals, outcomes, constraints)
       archive/                      # Archived vision versions
   roadmap/                          # Roadmap structure with checkpoint protocol
 ```
@@ -59,7 +57,7 @@ template/                           # Everything under here gets copied to the t
 - **Prompt files use `.prompt.md` extension** with YAML frontmatter (`description`, `agent`). Use `${input:variableName}` for runtime user input. Markdown links in prompt bodies auto-attach referenced files as context.
 - **Instruction files use `.instructions.md` extension** with optional `applyTo` glob in frontmatter. Placed in `.github/instructions/`.
 - **AGENTS.md** provides cross-agent instructions recognized by Copilot, Claude Code, and other AI agents.
-- **Vision lock is immutable.** Once written, it is never edited directly. Minor refinements go in `docs/vision/revisions/`. A completed vision is archived and replaced with a new version.
+- **Vision lock is a versioned living document.** Updated in place with changelog entries. Minor version bumps for within-scope changes; major version changes require human approval. Completed visions are archived to `docs/vision/archive/`.
 - **Stack skills** are Agent Skills (`.github/skills/<name>/SKILL.md`) created by the autonomous builder for each technology in the stack. They ground agents in official docs.
 - **No restrictive `tools` list** unless intentionally restricting (e.g., planner agent is read-only by design).
 - **Subagent support**: agents can list allowed subagents in frontmatter `agents:` array. The autonomous-builder uses planner, reviewer, tester, and Explore as subagents.

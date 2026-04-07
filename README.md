@@ -14,7 +14,7 @@ This template creates a complete `.github/` setup for autonomous development:
 - **Stack skills scaffold** — auto-created skills that ground agents in official docs for each technology
 - **5 manual override prompts** — plan, detail, implement, review, complete
 - **AGENTS.md** — cross-agent instructions (works with Copilot, Claude Code, etc.)
-- **Documentation skeleton** — vision lock (immutable), vision revisions, ADRs, open questions, tech debt, glossary
+- **Documentation skeleton** — vision lock (versioned living document), ADRs, open questions, tech debt, glossary
 - **Roadmap structure** — checkpoint-based cross-session continuity with machine-readable status
 - **Prompt guide** — how to use the workflow (for humans)
 
@@ -79,7 +79,7 @@ A **Stop hook** (`slice-gate.py`) enforces discipline: the agent cannot stop unt
 
 **Skills workflow**: During Phase 0 (and whenever a new technology is adopted), the builder creates Agent Skills in `.github/skills/` that ground all agents in official documentation for each technology in the stack. These are auto-discovered by Copilot when relevant.
 
-**Vision immutability**: The vision lock is written once and never edited. Minor refinements during implementation are tracked as vision revisions in `docs/vision/revisions/`. When the vision is fully realized, the agent proposes new directions and, after human approval, archives the old vision and writes a new version.
+**Vision lock**: A single versioned living document, updated in place with changelog entries. Minor version bumps for within-scope refinements (new constraints, priority shifts); major version changes (scope, goals) require human approval. When the vision is fully realized, the agent proposes new directions and, after human approval, archives the old vision and writes a new version.
 
 Each session is stateless — all cross-session continuity comes from files in the repo and repository memory.
 
