@@ -41,10 +41,20 @@ Review recent changes. If a specific scope is provided, focus there: **${input:r
 - Are new terms added to the glossary?
 
 ### 5. Security
-- Input validation at system boundaries?
-- No hardcoded secrets?
-- No command injection in subprocess calls?
-- Proper authentication handling?
+- Input validation at all system boundaries?
+- No hardcoded secrets, tokens, or credentials?
+- No command injection in subprocess calls? Proper shell escaping?
+- No SQL injection? Parameterized queries?
+- No template injection or XSS? Proper output encoding?
+- No credential leakage in logs, error messages, or reports?
+- No SSRF vulnerabilities in external API calls?
+- Proper authentication and minimal token scoping?
+- File system access: path traversal, symlink handling, permissions?
+
+### 6. Dependency Security
+- Run `npm audit` / `pip-audit` / `cargo audit` or equivalent if dependencies changed
+- Known CVEs in new or updated dependencies?
+- Outdated dependencies with security implications?
 
 ## Output Format
 

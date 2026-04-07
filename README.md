@@ -6,12 +6,15 @@ A [copier](https://copier.readthedocs.io/) template for bootstrapping an autonom
 
 This template creates a complete `.github/` setup for autonomous development:
 
-- **Autonomous builder agent** — a build loop that plans, implements, tests, and checkpoints
-- **Reviewer subagent** — code review with restricted read-only tools + handoff to fix
+- **Autonomous builder agent** — a build loop that plans, implements, tests, reviews, and checkpoints
+- **Reviewer subagent** — code review + security with restricted read-only tools + handoff to fix
 - **Planner subagent** — research and planning with read-only tools + handoff to implement
-- **7 dev-cycle prompts** — manual workflow: plan → implement → review → complete
+- **Tester subagent** — writes tests from specs before seeing implementation (context isolation)
+- **Stop hook** — deterministic enforcement that prevents premature stopping and skipped reviews
+- **5 manual override prompts** — plan, detail, implement, review, complete
+- **AGENTS.md** — cross-agent instructions (works with Copilot, Claude Code, etc.)
 - **Documentation skeleton** — vision lock, ADRs, open questions, tech debt, glossary
-- **Roadmap structure** — checkpoint-based cross-session continuity
+- **Roadmap structure** — checkpoint-based cross-session continuity with machine-readable status
 - **Prompt guide** — how to use the workflow (for humans)
 
 ## Usage
@@ -20,14 +23,14 @@ This template creates a complete `.github/` setup for autonomous development:
 
 ```bash
 pip install copier
-copier copy gh:YOUR_USER/copilot-autonomous-template my-new-project
+copier copy gh:jcentner/copilot-autonomous-template my-new-project
 ```
 
 ### Existing repo
 
 ```bash
 cd existing-repo
-copier copy gh:YOUR_USER/copilot-autonomous-template .
+copier copy gh:jcentner/copilot-autonomous-template .
 ```
 
 ### Update (pull template improvements)
@@ -40,9 +43,13 @@ copier update
 
 1. Open the repo in VS Code
 2. Review and customize `.github/copilot-instructions.md` for your project
-3. Write your initial vision in `docs/vision/VISION-LOCK.md`
-4. Select the **autonomous-builder** agent in Copilot Chat
-5. Tell it to start Phase 0 (vision baseline)
+3. Enable recommended settings:
+   - `chat.useCustomAgentHooks`: `true` (enables Stop hook)
+   - `chat.autopilot.enabled`: `true` (for autonomous sessions)
+   - `chat.agent.sandbox`: `true` (safety)
+4. Write your initial vision in `docs/vision/VISION-LOCK.md`
+5. Select the **autonomous-builder** agent in Copilot Chat
+6. Tell it to start Phase 0 (vision baseline)
 
 ## Template Variables
 
@@ -58,15 +65,29 @@ copier update
 
 The autonomous builder agent runs a continuous loop:
 
-1. **Discover** — reads checkpoint file, vision lock, and repo state
+1. **Orient** — reads checkpoint file, vision lock, and repo state
 2. **Plan** — identifies the next highest-leverage slice of work
-3. **Implement** — writes code, tests, and docs
-4. **Validate** — runs tests and reviews via subagents
-5. **Checkpoint** — commits and updates durable state for the next session
+3. **Implement** — writes code
+4. **Test** — runs tests (optionally uses tester subagent to write tests from spec first)
+5. **Review** — invokes reviewer subagent for code review + security
+6. **Fix** — addresses Critical/Major findings
+7. **Commit** — atomic commit with conventional message
+8. **Checkpoint** — updates durable state for the next session or slice
+
+A **Stop hook** (`slice-gate.py`) enforces discipline: the agent cannot stop until the phase is marked complete or explicitly blocked. This prevents premature stopping and skipped reviews.
+
+**Vision expansion gate**: When all vision goals are implemented, the agent proposes new directions and blocks until a human approves the expansion. Vision versions are archived before updates.
 
 Each session is stateless — all cross-session continuity comes from files in the repo and repository memory.
 
-The manual dev cycle (`/phase-plan` → `/implement` → `/code-review` → `/phase-complete`) remains available for human-driven sessions.
+The manual prompts (`/phase-plan` → `/implement` → `/code-review` → `/phase-complete`) remain available as override tools for human-driven sessions.
+
+### Copilot CLI Support
+
+The autonomous builder works with Copilot CLI for background execution:
+- Worktree isolation keeps agent changes separate from your active work
+- Custom agents are supported (experimental: `github.copilot.chat.cli.customAgents.enabled`)
+- Sessions continue when VS Code closes
 
 ## Inspired By
 
