@@ -2,7 +2,7 @@
 description: "Design system agent — establishes visual identity, reviews UI consistency, maintains DESIGN.md."
 tools:
   - search
-  - codebase
+  - search/codebase
   - web
 handoffs:
   - label: Fix Design Issues

@@ -42,9 +42,9 @@ Check `/memories/repo/` for notes from prior sessions. Do not load the entire do
 1. Read `roadmap/CURRENT-STATE.md` and `docs/vision/VISION-LOCK.md`
 2. Check `/memories/repo/` for prior session notes
 3. Determine mode:
+   - `BOOTSTRAP.md` exists in the project root → read and follow it (first session only)
    - **Phase Status** is `Vision Expansion Needed` → enter **vision expansion mode**
    - **Phase Status** is `In Progress` or vision has unfulfilled goals → enter **implementation mode**
-   - No vision lock exists → enter **Phase 0** (synthesize vision from repo evidence)
 
 ### 2. Implementation mode — the slice loop
 
@@ -111,6 +111,8 @@ When all goals in the vision's "Where We're Going" are implemented:
 5. Set **Phase Status** to `Blocked: Vision Expansion — awaiting human approval`
 6. **Stop.** Do not implement new directions without human approval.
 
+The human can also initiate this process at any time by running `/vision-expand` for an interactive brainstorm about what's next.
+
 When the human approves (next session, **Phase Status** will be `In Progress` again):
 
 1. Archive the current vision lock to `docs/vision/archive/VISION-LOCK.v{N}.md` (N = current version number)
@@ -118,22 +120,15 @@ When the human approves (next session, **Phase Status** will be `In Progress` ag
 3. Update the roadmap with new phases
 4. Resume implementation mode
 
-### 4. Phase 0 — first session only
+### 4. Bootstrap (first session only)
 
-If no vision lock exists, synthesize one from existing repo evidence:
+If `BOOTSTRAP.md` exists in the project root, read and follow it. It contains the full bootstrap protocol — greenfield detection, human interview, vision synthesis, catalog evaluation, and artifact creation.
 
-1. Read all project docs, notes, and code
-2. Create `docs/vision/VISION-LOCK.md` — **synthesized from evidence, not invented**
-3. The vision lock must not introduce claims, scope, or features not already present in the repo
-4. **Bootstrap stack skills** — identify the project's technology stack and create a skill for each significant technology (see [Stack Skills](#stack-skills))
-5. **Evaluate the workflow catalog** — scan `.github/catalog/MANIFEST.md` and activate items matching the project (see [Expand the workflow](#expand-the-workflow))
-6. Create initial ADRs for key technical decisions
-7. Define Phase 1 in `roadmap/phases/`
-8. Update `roadmap/CURRENT-STATE.md`
+`BOOTSTRAP.md` is self-deleting: its final instruction is to remove itself and commit. After bootstrap, the builder never wastes context on first-run instructions again.
 
 ### 5. Expand the workflow
 
-During Phase 0 and at the start of each new phase, evaluate the workflow catalog for capabilities that match the project.
+During bootstrap and at the start of each new phase, evaluate the workflow catalog for capabilities that match the project.
 
 **Read** `.github/catalog/MANIFEST.md` for available items and their trigger conditions.
 
@@ -155,9 +150,9 @@ During Phase 0 and at the start of each new phase, evaluate the workflow catalog
 
 | Phase | Evaluate | Reason |
 |-------|----------|--------|
-| Phase 0 | tool-guardrails, commit-trailers | Safety baseline |
-| Phase 0 | designer + DESIGN.md (if frontend code exists) | Design before code |
-| Phase 0 | ci-verification (if `.github/workflows/` exists) | CI awareness |
+| Bootstrap | tool-guardrails, commit-trailers | Safety baseline |
+| Bootstrap | designer + DESIGN.md (if frontend code exists) | Design before code |
+| Bootstrap | ci-verification (if `.github/workflows/` exists) | CI awareness |
 | Phase planning | product-owner (if no user stories exist for the phase) | Build the right thing |
 | Phase planning | critic (if phase has 5+ slices) | Challenge the plan |
 | Any slice | security-reviewer (if auth/PII/payments code appears) | Security depth |

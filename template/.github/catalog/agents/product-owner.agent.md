@@ -2,7 +2,7 @@
 description: "Product owner agent — writes user stories, defines acceptance criteria, validates features against user needs."
 tools:
   - search
-  - codebase
+  - search/codebase
   - web
 handoffs:
   - label: Create Implementation Plan

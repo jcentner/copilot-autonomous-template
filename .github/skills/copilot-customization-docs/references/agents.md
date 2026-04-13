@@ -27,9 +27,9 @@ description: "Brief description shown as placeholder text in chat input"
 name: "Agent name (defaults to filename if omitted)"
 argument-hint: "Hint text shown in chat input to guide user interaction"
 tools:
-  - search           # Built-in tool
-  - web              # Built-in tool
-  - codebase         # Built-in tool
+  - search           # Built-in tool set (includes search/codebase, search/textSearch, etc.)
+  - web              # Built-in tool set (includes web/fetch)
+  - search/codebase  # Individual built-in tool
   - myServer/*       # All tools from an MCP server
 agents:
   - planner          # Allowed subagent names

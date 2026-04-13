@@ -2,9 +2,9 @@
 description: "Security review agent — OWASP Top 10, secrets detection, auth/authz audit, dependency vulnerabilities."
 tools:
   - search
-  - codebase
-  - terminalLastCommand
-  - terminalSelection
+  - search/codebase
+  - read/terminalLastCommand
+  - read/terminalSelection
 handoffs:
   - label: Fix Security Issues
     agent: agent
@@ -104,5 +104,5 @@ Read these when invoked:
 - **Do not modify files** — report findings only. Use the handoff for fixes.
 - **Be specific** — cite file paths, line numbers, and exact vulnerable patterns.
 - **Provide exploit scenarios** — explain how each finding could be exploited, not just that it exists.
-- **Check terminal output** — use terminalLastCommand/terminalSelection to verify audit command results.
+- **Check terminal output** — use `read/terminalLastCommand` / `read/terminalSelection` to verify audit command results.
 - **No false positives** — if you're unsure whether something is vulnerable, say so rather than flagging it as definite.

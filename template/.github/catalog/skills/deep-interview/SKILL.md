@@ -9,7 +9,7 @@ Structured requirements clarification through Socratic questioning. Use this ski
 
 ## When to Use
 
-- Phase 0: Understanding an existing project's intent
+- Bootstrap: Understanding an existing project's intent
 - New phase planning: Clarifying what features should do
 - Ambiguous user requests: "Build me a dashboard" (what kind? for whom? showing what?)
 - After discovering conflicting requirements in docs

@@ -16,6 +16,15 @@ VS Code Chat → Session Target → Copilot CLI → select autonomous-builder ag
 
 The builder reads `roadmap/CURRENT-STATE.md`, picks up where it left off, and runs a continuous loop: plan → implement → test → review → commit → checkpoint. It uses subagents for research (planner), testing (tester), and review (reviewer).
 
+### First session (greenfield or existing)
+
+On the first session, the builder reads `BOOTSTRAP.md` from the project root. It detects whether this is a new project (no code) or an existing one (has code):
+
+- **Greenfield**: The builder interviews you interactively — what you're building, for whom, with what tech, and what's in v1.
+- **Existing project**: The builder scans your code, docs, and dependencies to synthesize the vision automatically.
+
+Both paths produce a vision lock, Phase 1 plan, stack skills, and initial ADRs. Then `BOOTSTRAP.md` is deleted and never loaded again.
+
 ### Autopilot settings
 
 For fully autonomous sessions, enable these VS Code settings:
@@ -32,6 +41,7 @@ These prompts are available for human-driven sessions when you want direct contr
 
 | Prompt | What It Does | When to Use |
 |--------|--------------|-------------|
+| `/vision-expand` | Interactive brainstorm for what's next after current vision is fulfilled | Vision complete, planning next directions |
 | `/phase-plan` | Create a phase planning doc with features, dependencies, acceptance criteria | Starting a new phase manually |
 | `/implementation-plan` | Create a file-by-file implementation checklist from a phase doc | Detailed planning before coding |
 | `/implement` | Execute an implementation plan step-by-step | Implementing from an approved plan |
@@ -46,6 +56,17 @@ These prompts are available for human-driven sessions when you want direct contr
 | `planner` | Research and analysis | Read-only (search, web, codebase) | Subagent of builder |
 | `reviewer` | Code review + security | Read-only + terminal output | Subagent of builder |
 | `tester` | Write tests from specs | All tools (hidden from picker) | Subagent of builder |
+
+### Catalog Agents (activated on demand)
+
+These agents live in `.github/catalog/agents/` and are activated by the builder when project characteristics match their trigger conditions. See `.github/catalog/MANIFEST.md` for triggers and details.
+
+| Agent | Role | Trigger |
+|-------|------|---------|
+| `designer` | Visual design system via DESIGN.md | Project has frontend/UI code |
+| `product-owner` | User stories + acceptance criteria | Phase planning with missing user stories |
+| `security-reviewer` | OWASP, secrets, auth/authz audit | Project handles auth, payments, or PII |
+| `critic` | Challenges plans before coding | Phase has 5+ slices |
 
 Agents support **handoffs** — the planner has a button to hand off to implementation, the reviewer has a button to hand off to fix issues.
 
@@ -62,11 +83,15 @@ Agents support **handoffs** — the planner has a button to hand off to implemen
 │  │          │  │  spec)   │  │                │ │
 │  └─────────┘  └──────────┘  └────────────────┘ │
 │                                                 │
+│  Catalog agents (activated on demand):          │
+│  designer · product-owner · security-reviewer   │
+│  critic                                         │
+│                                                 │
 │  Stop hook: slice-gate.py                       │
 │  (enforces review + prevents premature stop)    │
 └─────────────────────────────────────────────────┘
 
-Manual overrides: /phase-plan  /implementation-plan  /implement  /code-review  /phase-complete
+Manual overrides: /vision-expand  /phase-plan  /implementation-plan  /implement  /code-review  /phase-complete
 ```
 
 ## How Prompts & Agents Work
@@ -76,6 +101,7 @@ Manual overrides: /phase-plan  /implementation-plan  /implement  /code-review  /
 - **Instruction files** (`.instructions.md`) — applied automatically when Copilot works on matching files.
 - **Hooks** (`.github/hooks/`) — deterministic shell commands at agent lifecycle points (e.g., Stop hook blocks premature stopping).
 - **Skills** (`.github/skills/`) — technology-specific knowledge that Copilot auto-loads when relevant. Created by the autonomous builder for each stack technology.
+- **Workflow catalog** (`.github/catalog/`) — dormant agents, skills, hooks, and patterns that the builder activates when project characteristics match trigger conditions. See `MANIFEST.md` for the full index.
 - **AGENTS.md** — cross-agent instructions recognized by Copilot, Claude Code, and other AI agents.
 - Markdown links in prompt/agent bodies **auto-attach referenced files as context**.
 - Prompts link to `copilot-instructions.md` for shared project context.

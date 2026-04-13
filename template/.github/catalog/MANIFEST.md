@@ -57,7 +57,7 @@ Available capabilities that can be activated by the autonomous builder or manual
 |-------|-------|
 | Source | `catalog/skills/deep-interview/SKILL.md` |
 | Activates to | `.github/skills/deep-interview/SKILL.md` |
-| Trigger | New project (Phase 0), vague requirements, or user explicitly asks for requirements clarification |
+| Trigger | New project (bootstrap), vague requirements, or user explicitly asks for requirements clarification |
 | Description | Socratic requirements elicitation. Surfaces hidden assumptions through structured questioning with ambiguity gating. Uses `vscode_askQuestions` for interactive interview. |
 
 ### anti-slop
@@ -95,7 +95,7 @@ Available capabilities that can be activated by the autonomous builder or manual
 |-------|-------|
 | Source | `catalog/hooks/tool-guardrails.json` |
 | Activates to | `.github/hooks/tool-guardrails.json` |
-| Trigger | Always recommended — activate during Phase 0 |
+| Trigger | Always recommended — activate during bootstrap |
 | Description | PreToolUse guards: block `git push --force`, `git reset --hard`, protect critical files from deletion, block writes to `node_modules/`. |
 
 ### ci-gate
@@ -153,7 +153,7 @@ Available capabilities that can be activated by the autonomous builder or manual
 |-------|-------|
 | Source | `catalog/patterns/commit-trailers.md` |
 | Activates to | Referenced in `copilot-instructions.md` (builder appends the convention) |
-| Trigger | Phase 0 or first session — always recommended |
+| Trigger | Bootstrap or first session — always recommended |
 | Description | Structured git commit trailers for decision context preservation: `Constraint:`, `Rejected:`, `Confidence:`, `Scope-risk:`, `Not-tested:`. |
 
 ## External Sources

@@ -3,7 +3,7 @@ description: "Research and planning agent — read-only analysis, no code change
 tools:
   - search
   - web
-  - codebase
+  - search/codebase
 handoffs:
   - label: Create Implementation Plan
     agent: agent

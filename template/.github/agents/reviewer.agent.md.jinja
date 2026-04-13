@@ -2,9 +2,9 @@
 description: "Code review agent — analyzes code quality, architecture compliance, and project conventions."
 tools:
   - search
-  - codebase
-  - terminalLastCommand
-  - terminalSelection
+  - search/codebase
+  - read/terminalLastCommand
+  - read/terminalSelection
 handoffs:
   - label: Fix Issues
     agent: agent
@@ -54,7 +54,7 @@ Report doc-sync findings as **Major** severity — docs-drift compounds silently
 - **Distinguish severity**: Separate critical issues (must fix) from style preferences (nit).
 - **Provide alternatives**: Don't just flag problems — suggest concrete fixes.
 - **Do not modify files**: Present findings only. Use the **Fix Issues** handoff when fixes are needed.
-- **You can view terminal output** via terminalLastCommand/terminalSelection to check test results.
+- **You can view terminal output** via `read/terminalLastCommand` / `read/terminalSelection` to check test results.
 
 ## Output
 

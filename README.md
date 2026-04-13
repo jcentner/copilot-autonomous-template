@@ -16,6 +16,7 @@ This template creates a complete `.github/` setup for autonomous development:
 - **AGENTS.md** — cross-agent instructions (works with Copilot, Claude Code, etc.)
 - **Documentation skeleton** — vision lock (versioned living document), ADRs, open questions, tech debt, glossary
 - **Roadmap structure** — checkpoint-based cross-session continuity with machine-readable status
+- **Workflow catalog** — dormant agents, skills, hooks, prompts, and patterns that the builder activates on demand when project needs match trigger conditions (4 agents, 4 skills, 3 hooks, 2 prompts, 2 patterns)
 - **Prompt guide** — how to use the workflow (for humans)
 
 ## Usage
@@ -48,9 +49,9 @@ copier update
    - `chat.useCustomAgentHooks`: `true` (enables Stop hook)
    - `chat.autopilot.enabled`: `true` (for autonomous sessions)
    - `chat.agent.sandbox`: `true` (safety)
-4. The autonomous builder synthesizes your initial vision into `docs/vision/VISION-LOCK.md`
+4. The repo includes a `BOOTSTRAP.md` that guides the first session — greenfield projects get an interactive brainstorm, existing projects get automatic vision synthesis
 5. Select the **autonomous-builder** agent in Copilot Chat
-6. Tell it to start Phase 0 (vision baseline + stack skills)
+6. The builder reads `BOOTSTRAP.md`, completes it, deletes it, and continues to implementation
 
 ## Template Variables
 
@@ -77,7 +78,9 @@ The autonomous builder agent runs a continuous loop:
 
 A **Stop hook** (`slice-gate.py`) enforces discipline: the agent cannot stop until the phase is marked complete or explicitly blocked. This prevents premature stopping and skipped reviews.
 
-**Skills workflow**: During Phase 0 (and whenever a new technology is adopted), the builder creates Agent Skills in `.github/skills/` that ground all agents in official documentation for each technology in the stack. These are auto-discovered by Copilot when relevant.
+**Skills workflow**: During bootstrap (and whenever a new technology is adopted), the builder creates Agent Skills in `.github/skills/` that ground all agents in official documentation for each technology in the stack. These are auto-discovered by Copilot when relevant.
+
+**Workflow catalog**: The template ships with a catalog of pre-vetted dormant capabilities in `.github/catalog/`. During bootstrap, the builder evaluates project characteristics against catalog trigger conditions and activates matching items by copying them into the appropriate `.github/` directories. For example, a project with a UI gets the designer agent and design-system skill; a project with CI gets the ci-gate hook. The catalog enables a lean default footprint that self-expands as project needs emerge. See `MANIFEST.md` for the full index.
 
 **Vision lock**: A single versioned living document, updated in place with changelog entries. Minor version bumps for within-scope refinements (new constraints, priority shifts); major version changes (scope, goals) require human approval. When the vision is fully realized, the agent proposes new directions and, after human approval, archives the old vision and writes a new version.
 

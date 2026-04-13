@@ -6,7 +6,7 @@ This directory contains **dormant workflow capabilities** — pre-crafted agents
 
 1. The builder reads [MANIFEST.md](MANIFEST.md) to discover available capabilities
 2. Each item has **trigger conditions** — project characteristics that indicate the item is needed
-3. During Phase 0 and at the start of each phase, the builder evaluates triggers and activates matching items
+3. During bootstrap and at the start of each phase, the builder evaluates triggers and activates matching items
 4. Activation = copy the file from `catalog/` to its target location + log the activation
 
 ## What's Here

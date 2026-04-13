@@ -2,7 +2,7 @@
 description: "Plan critic agent — challenges implementation plans before coding starts. Identifies assumptions, missing edge cases, and scope risks."
 tools:
   - search
-  - codebase
+  - search/codebase
   - web
 handoffs:
   - label: Revise Plan
