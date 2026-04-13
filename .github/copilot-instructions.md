@@ -32,6 +32,14 @@ template/                           # Everything under here gets copied to the t
       phase-complete.prompt.md.jinja      # Complete a phase, update docs
     skills/
       README.md                     # Stack skills convention (verbatim)
+    catalog/                        # Dormant workflow capabilities (the storehouse)
+      MANIFEST.md                   # Machine-readable index of all catalog items (also a skill)
+      README.md                     # How the catalog works
+      agents/                       # Pre-crafted agents: designer, product-owner, security-reviewer, critic
+      skills/                       # Pre-crafted skills: deep-interview, anti-slop, design-system, ci-verification
+      hooks/                        # Pre-crafted hooks: tool-guardrails, ci-gate, context-checkpoint
+      prompts/                      # Pre-crafted prompts: clarify, design-review
+      patterns/                     # Reusable patterns: DESIGN.md template, commit trailers
   docs/                             # Documentation skeleton (vision, architecture, reference)
     vision/
       VISION-LOCK.md.jinja          # Versioned vision lock (goals, outcomes, constraints)
@@ -60,8 +68,9 @@ template/                           # Everything under here gets copied to the t
 - **Vision lock is a versioned living document.** Updated in place with changelog entries. Minor version bumps for within-scope changes; major version changes require human approval. Completed visions are archived to `docs/vision/archive/`.
 - **Stack skills** are Agent Skills (`.github/skills/<name>/SKILL.md`) created by the autonomous builder for each technology in the stack. They ground agents in official docs.
 - **No restrictive `tools` list** unless intentionally restricting (e.g., planner agent is read-only by design).
-- **Subagent support**: agents can list allowed subagents in frontmatter `agents:` array. The autonomous-builder uses planner, reviewer, tester, and Explore as subagents.
+- **Subagent support**: agents can list allowed subagents in frontmatter `agents:` array. The autonomous-builder pre-lists both core (planner, reviewer, tester) and catalog (designer, product-owner, security-reviewer, critic) subagents. Catalog agents that don't exist as files are silently ignored until activated.
 - **Handoffs**: agents define `handoffs:` in frontmatter to create transition buttons between agents (e.g., planner → implementation).
+- **Workflow catalog** (`.github/catalog/`): Pre-vetted dormant capabilities the builder can activate on demand. MANIFEST.md is both the index and a skill (auto-discoverable by any agent). Catalog items are copied verbatim (no Jinja). Activation is autonomous for catalog items, human-approved for external sources.
 
 ## Validating Changes
 

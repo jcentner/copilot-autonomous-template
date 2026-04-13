@@ -4,6 +4,10 @@ agents:
   - planner
   - reviewer
   - tester
+  - designer
+  - product-owner
+  - security-reviewer
+  - critic
   - Explore
 hooks:
   Stop:
@@ -27,6 +31,7 @@ Read on demand as needed:
 - [Tech debt](../../docs/reference/tech-debt.md)
 - [Glossary](../../docs/reference/glossary.md)
 - [Stack skills](../../.github/skills/) — consult when working with specific technologies
+- [Workflow catalog](../../.github/catalog/MANIFEST.md) — dormant capabilities that can be activated on demand
 
 Check `/memories/repo/` for notes from prior sessions. Do not load the entire doc tree upfront — use the **Explore** subagent for broad searches.
 
@@ -121,11 +126,53 @@ If no vision lock exists, synthesize one from existing repo evidence:
 2. Create `docs/vision/VISION-LOCK.md` — **synthesized from evidence, not invented**
 3. The vision lock must not introduce claims, scope, or features not already present in the repo
 4. **Bootstrap stack skills** — identify the project's technology stack and create a skill for each significant technology (see [Stack Skills](#stack-skills))
-5. Create initial ADRs for key technical decisions
-6. Define Phase 1 in `roadmap/phases/`
-7. Update `roadmap/CURRENT-STATE.md`
+5. **Evaluate the workflow catalog** — scan `.github/catalog/MANIFEST.md` and activate items matching the project (see [Expand the workflow](#expand-the-workflow))
+6. Create initial ADRs for key technical decisions
+7. Define Phase 1 in `roadmap/phases/`
+8. Update `roadmap/CURRENT-STATE.md`
 
-### 5. Improve the development system
+### 5. Expand the workflow
+
+During Phase 0 and at the start of each new phase, evaluate the workflow catalog for capabilities that match the project.
+
+**Read** `.github/catalog/MANIFEST.md` for available items and their trigger conditions.
+
+**Activation protocol:**
+
+1. Evaluate each unactivated catalog item's trigger condition:
+   - Check for file patterns (e.g., `*.tsx` → designer agent)
+   - Check for directory existence (e.g., `.github/workflows/` → ci-verification)
+   - Grep for keywords (e.g., `auth`, `login`, `payment` → security-reviewer)
+   - Check plan complexity (e.g., 5+ slices → critic agent)
+2. For each item that matches:
+   a. Copy the file from `catalog/` to its activation path
+   b. If activating a hook, copy its script to `.github/hooks/scripts/` and its config to `.github/hooks/`
+   c. If activating a pattern, copy to its target location
+   d. Log the activation in `docs/reference/agent-improvement-log.md` with tag `[EXPANSION]`
+3. Commit all activations: `chore(workflow): activate {items} from catalog`
+
+**Auto-evaluate triggers by phase:**
+
+| Phase | Evaluate | Reason |
+|-------|----------|--------|
+| Phase 0 | tool-guardrails, commit-trailers | Safety baseline |
+| Phase 0 | designer + DESIGN.md (if frontend code exists) | Design before code |
+| Phase 0 | ci-verification (if `.github/workflows/` exists) | CI awareness |
+| Phase planning | product-owner (if no user stories exist for the phase) | Build the right thing |
+| Phase planning | critic (if phase has 5+ slices) | Challenge the plan |
+| Any slice | security-reviewer (if auth/PII/payments code appears) | Security depth |
+| 10+ slice session | context-checkpoint | Session longevity |
+| After reviewer flags AI patterns | anti-slop | Code quality |
+
+**Catalog items are pre-vetted** — activation requires no human approval. Log everything.
+
+**Subagent availability**: Catalog agent names are pre-listed in this agent's `agents:` frontmatter. When a catalog agent's `.agent.md` file doesn't yet exist in `.github/agents/`, the name is simply ignored. Once activated (file copied), the agent becomes available as a subagent in the next session.
+
+**External expansion** (requires human approval):
+
+If the catalog doesn't have what you need, propose fetching from an external source. The catalog's MANIFEST.md lists vetted external sources. Write the proposal to `roadmap/CURRENT-STATE.md` under `## Proposed Workflow Expansion`, set **Phase Status** to `Blocked: Workflow Expansion — awaiting approval`, and stop.
+
+### 6. Improve the development system
 
 You may modify the repo's own Copilot instructions, prompts, and agents when:
 - A concrete failure mode was observed (slice shipped with stale docs, reviewer was skipped, etc.)
@@ -142,7 +189,7 @@ Every such improvement **must** be logged in `docs/reference/agent-improvement-l
 
 **Do not weaken standards to preserve momentum.** Never lower evidence requirements, testing requirements, or definition of done. The improvement log itself is non-negotiable — do not bypass it.
 
-### 6. End of session
+### 7. End of session
 
 Before stopping, you **must**:
 
