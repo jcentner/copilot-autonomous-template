@@ -1,6 +1,10 @@
 ---
-description: "Review UI changes against the project's DESIGN.md for visual consistency."
+description: "Review UI changes against the project's DESIGN.md for visual consistency. Uses browser tools when available."
 agent: agent
+tools:
+  - search
+  - search/codebase
+  - browser
 ---
 
 # Design Review
@@ -60,3 +64,15 @@ Report findings as:
 | Critical/Major/Minor/Nit | path:line | description | fix |
 
 Then rate overall design consistency: Consistent / Minor Drift / Significant Drift.
+
+## Visual Verification
+
+If browser tools are available (`workbench.browser.enableChatTools` enabled) and a dev server is running:
+
+1. Navigate to pages affected by the changes
+2. Take screenshots to capture rendered output
+3. Verify colors, typography, spacing, and component states match DESIGN.md visually
+4. Test interactive states (hover, focus, error) by clicking and hovering elements
+5. Include screenshot evidence in findings where visual issues are detected
+
+If browser tools are not available, perform all checks via code inspection only.

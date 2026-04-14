@@ -17,7 +17,7 @@ Available capabilities that can be activated by the autonomous builder or manual
 | Activates to | `.github/agents/designer.agent.md` |
 | Trigger | Project has frontend/UI code (`*.tsx`, `*.vue`, `*.html`, `*.css`, `*.svelte`) or vision mentions design/UX/UI |
 | Requires | `DESIGN.md` pattern (auto-install if missing) |
-| Description | Establishes and enforces visual design system via DESIGN.md. Reviews UI changes for consistency. |
+| Description | Establishes and enforces visual design system via DESIGN.md. Reviews UI changes for consistency. Uses `browser` tools for visual verification when available (requires `workbench.browser.enableChatTools`). |
 
 ### product-owner
 
@@ -27,7 +27,7 @@ Available capabilities that can be activated by the autonomous builder or manual
 | Activates to | `.github/agents/product-owner.agent.md` |
 | Trigger | Phase planning when user stories or acceptance criteria are absent, or builder encounters ambiguous requirements |
 | Requires | None |
-| Description | Writes user stories with acceptance criteria, maps user journeys, validates that implementation matches user expectations. |
+| Description | Writes user stories with acceptance criteria, maps user journeys, validates that implementation matches user expectations. Uses `browser` tools for visual acceptance testing when available. |
 
 ### security-reviewer
 
@@ -134,7 +134,7 @@ Available capabilities that can be activated by the autonomous builder or manual
 | Source | `catalog/prompts/design-review.prompt.md` |
 | Activates to | `.github/prompts/design-review.prompt.md` |
 | Trigger | Activated alongside designer agent |
-| Description | Review UI changes against the project's DESIGN.md for visual consistency, typography, color, spacing, and anti-patterns. |
+| Description | Review UI changes against the project's DESIGN.md for visual consistency, typography, color, spacing, and anti-patterns. Includes `browser` tools for visual verification when available. |
 
 ## Patterns
 

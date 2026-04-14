@@ -1,9 +1,10 @@
 ---
-description: "Design system agent — establishes visual identity, reviews UI consistency, maintains DESIGN.md."
+description: "Design system agent — establishes visual identity, reviews UI consistency, maintains DESIGN.md. Uses browser tools for visual verification when available."
 tools:
   - search
   - search/codebase
   - web
+  - browser
 handoffs:
   - label: Fix Design Issues
     agent: agent
@@ -54,7 +55,13 @@ When reviewing UI-touching slices:
 
 1. Read DESIGN.md
 2. Review changed files against the design system
-3. Report findings with severity:
+3. **Visual verification** (when browser tools are available and a dev server is running):
+   - Navigate to the affected pages using `#tool:browser/navigatePage`
+   - Take screenshots with `#tool:browser/screenshot` to capture the rendered result
+   - Compare the visual output against DESIGN.md tokens — check colors, typography, spacing, component states
+   - Test interactive states: hover buttons, focus inputs, trigger error states
+   - If `prefers-reduced-motion` support is specified, verify animations respect the setting
+4. Report findings with severity:
 
 | Severity | Meaning |
 |----------|---------|
@@ -98,5 +105,17 @@ Then provide an overall design health assessment.
 ## References
 
 - [Impeccable](https://impeccable.style/) — design vocabulary, anti-patterns, and audit methodology
+
+## Visual Verification (Experimental)
+
+The `browser` tool set enables visual verification of rendered UI. It requires the `workbench.browser.enableChatTools` VS Code setting to be enabled and a dev server to be running.
+
+When browser tools are available:
+- **Establish phase**: After creating DESIGN.md, open the app and screenshot key pages as baseline references
+- **Review phase**: Navigate to changed pages, screenshot them, and validate against DESIGN.md tokens
+- **Interactive checks**: Click, hover, and focus elements to verify all component states render correctly
+- **Contrast verification**: Screenshot text on colored backgrounds to visually confirm readability
+
+When browser tools are NOT available (setting disabled or no dev server), fall back to code-only review — inspecting CSS values, design token usage, and component props against DESIGN.md.
 - [Google Stitch DESIGN.md format](https://stitch.withgoogle.com/docs/design-md/format/) — the format standard for DESIGN.md
 - [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) — real-world DESIGN.md examples from 66 brands

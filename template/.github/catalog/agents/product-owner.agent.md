@@ -1,9 +1,10 @@
 ---
-description: "Product owner agent — writes user stories, defines acceptance criteria, validates features against user needs."
+description: "Product owner agent — writes user stories, defines acceptance criteria, validates features against user needs. Uses browser tools for visual acceptance testing when available."
 tools:
   - search
   - search/codebase
   - web
+  - browser
 handoffs:
   - label: Create Implementation Plan
     agent: agent
@@ -74,6 +75,11 @@ When asked to review a completed feature:
 3. Check for user-facing text: is it clear, consistent, and helpful?
 4. Check for missing affordances: can the user discover how to use this?
 5. Flag anything that technically works but would confuse a real user
+6. **Visual acceptance testing** (when browser tools are available and a dev server is running):
+   - Navigate to the feature pages and walk through user journeys
+   - Screenshot key states (empty, loaded, error, edge cases)
+   - Verify the user can discover and complete the happy path without confusion
+   - Check that error states show helpful, actionable messages
 
 ## Output Format
 
