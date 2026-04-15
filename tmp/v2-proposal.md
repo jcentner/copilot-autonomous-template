@@ -1,7 +1,7 @@
 # Autonomous Workflow Template v2 — Unified Proposal
 
 > Written: April 15, 2026
-> Status: Draft — awaiting decisions on open questions before implementation
+> Status: **Decisions finalized** — ready for implementation
 
 ---
 
@@ -404,87 +404,114 @@ The template should clearly distinguish these tiers rather than claiming everyth
 
 ---
 
-## Open Questions + Recommendations
+## Decisions
 
-### OQ-1: Tester tool restriction
+> All open questions resolved April 15, 2026.
 
-**Question:** The tester's "don't read implementation" promise can be partially enforced by removing `read` from its tools list — but this also prevents it from reading test utilities, framework configs, and existing test patterns.
+### OQ-1: Tester tool restriction — DECIDED: PreToolUse hook (option c)
 
-**Options:**
-- (a) Restrict tools and accept the tester can't read existing test patterns (purer isolation, but may write tests that don't match project conventions)
-- (b) Use instruction-level rule only, accept it's not mechanically enforced (pragmatic, but the tester could look at implementation)
-- (c) Use a PreToolUse hook on the tester that blocks reads to `src/` but allows reads to `tests/`, `__tests__/`, `*.test.*`, `*.spec.*` (best of both worlds, more hook complexity)
+**Decision:** Use a PreToolUse hook on the tester that blocks reads to implementation directories but allows reads to test files and config.
 
-**Recommendation:** Option (c). The hook can be simple — check if `tool_name` is a read tool and the path matches implementation directories. The tester needs to read test patterns but not implementation code.
+**Why:** The tester's entire value is writing tests without implementation bias. Instruction-only enforcement (b) is effectively unenforced — LLMs follow the path of least resistance. Stripping all read tools (a) is too blunt — the tester can't read existing test helpers or framework config.
 
-### OQ-2: Bootstrap pattern
+**Implementation details:**
+- Hook allows reads to: `**/test*/**`, `**/*.test.*`, `**/*.spec.*`, `*.config.*`, `package.json`, `tsconfig.json`, `pyproject.toml`, `Cargo.toml`, and similar config files
+- Hook blocks reads to everything under the configured `Source Root` that doesn't match the above patterns
+- Uses the same `Source Root` field from CURRENT-STATE.md as the stage gate (see OQ-5)
+- Handles monorepo layouts where tests live alongside source (`src/foo.test.ts` is allowed even inside `src/`)
 
-**Question:** The parallel analysis suggests dropping the self-deleting BOOTSTRAP.md. The current pattern has merit (keeps builder lean after first session) but adds branching logic to the builder.
+### OQ-2: Bootstrap pattern — DECIDED: Keep self-deleting, slim aggressively (option a)
 
-**Options:**
-- (a) Keep self-deleting BOOTSTRAP.md, slim it significantly
-- (b) Move bootstrap logic into a dedicated `bootstrap.agent.md` that is only used for first session, then `user-invocable: false` after
-- (c) Move bootstrap into the builder's SessionStart hook (inject bootstrap context on first session only)
-- (d) Make bootstrap a prompt (`/bootstrap`) that the user explicitly runs
+**Decision:** Keep the self-deleting BOOTSTRAP.md pattern, but cut from ~140 lines to ~50 lines by delegating the interview to the planner subagent.
 
-**Recommendation:** Option (a) with significant slimming. The self-deleting pattern is elegant — the builder checks for BOOTSTRAP.md, follows it, deletes it, never thinks about it again. But the current BOOTSTRAP.md is too long (140+ lines). Slim it to: detect project type → interview or synthesize → write vision + phase 1 design → delete self. Move the catalog evaluation to a separate step the builder does after bootstrap.
+**Why:** The self-deleting pattern is elegant — check for BOOTSTRAP.md, follow it, delete it, never think about it again. Option (b) has no real "disable after first run" mechanism. Option (c) injects a massive protocol into every session until manually removed. Option (d) breaks the "open VS Code, pick builder, start" promise.
 
-### OQ-3: Human gate implementation under autopilot
+**What to keep:** Detect project type → delegate interview to planner subagent → write vision lock → write phase 1 design plan → update CURRENT-STATE → delete self.
 
-**Question:** The design proposes `vscode_askQuestions` at plan approval and post-review. Under full autopilot, these get auto-responded. This undermines the approval model.
+**What to cut:**
+- 4-round inline interview protocol (planner handles this)
+- Stack skills creation (builder does this during phase 1 execution)
+- Catalog evaluation (builder does this as a post-bootstrap step, presenting options via `vscode_askQuestions`)
 
-**Options:**
-- (a) Accept that autopilot skips gates (autonomy-first). The builder decides on its own. Hooks still enforce artifacts exist.
-- (b) Use `Blocked` status to force a session break at gates (safety-first). The builder sets `Stage: blocked` with reason, the Stop hook allows it, and the human must restart a new session to continue.
-- (c) Make it configurable: check for a `## Gate Policy` field in CURRENT-STATE. Values: `autonomous` (gates are self-approved with logged reasoning), `interactive` (gates use vscode_askQuestions), `strict` (gates block the session).
-- (d) Hybrid: design plan approval is always a session break (too important to auto-approve), but slice-level reviews are autonomous.
+### OQ-3: Human gates under autopilot — DECIDED: Design approval = session break, rest autonomous (option d)
 
-**Recommendation:** Option (d). The design plan is the highest-leverage approval point — getting it wrong wastes an entire phase of work. Force a session break there. Implementation plan approval and phase review can be autonomous with logged reasoning under autopilot, or interactive under manual mode. This gives you the "autonomy inside approved bounds" model: once the design is human-approved, the builder can execute autonomously within it.
+**Decision:** Design plan approval always forces a session break. Implementation plan approval and phase review are autonomous with mandatory logging under autopilot, interactive under manual mode.
 
-### OQ-4: Catalog boundary after promotions
+**Why:** This is the highest-stakes decision in the proposal. The design plan is the highest-leverage approval point — getting it wrong wastes an entire phase. But blocking *every* gate kills velocity and pushes users to disable the system.
 
-**Question:** With critic and product-owner promoted to core, the catalog shrinks to designer, security-reviewer, and the skills/patterns. Is that enough to justify the catalog infrastructure (MANIFEST.md, activation protocol, catalog/ directory tree)?
+**How session break works:**
+1. Builder completes design plan + critique rounds
+2. Builder sets `Stage: blocked`, `Blocked Reason: Design plan awaiting human approval — review roadmap/phases/phase-N-design.md`
+3. Stop hook sees `blocked` → allows session end
+4. Human reads the design plan, starts new session, says "design approved" or gives feedback
+5. New session resumes from `blocked` → advances to `implementation-planning`
 
-**Options:**
-- (a) Keep catalog as-is, just smaller. The infrastructure is already built and works.
-- (b) Collapse catalog into a simpler `optional/` directory with a README. No MANIFEST.md, no activation protocol. Just "copy this file to .github/agents/ if you want it."
-- (c) Remove catalog entirely. Ship designer and security-reviewer as commented-out agents in `.github/agents/` with a note saying "uncomment if needed."
-- (d) Keep catalog but make MANIFEST.md a skill (already is) and remove the activation protocol from the builder. Activation is manual only.
+**Why this is actually good:** Design plan approval is a natural session boundary. The planner researches, writes the plan, critique iterates — that's a full session of context. Starting fresh for implementation prevents context saturation.
 
-**Recommendation:** Option (d). The catalog infrastructure is lightweight and the MANIFEST.md-as-skill pattern is clever — any agent can discover available capabilities by reading it. But remove the builder's autonomous activation protocol. Catalog items are activated by humans (at bootstrap via `vscode_askQuestions` or manually later). This eliminates the fragile heuristic matching while preserving discoverability.
+**Autonomous gate logging:** When the builder self-approves implementation plan or phase review, it writes to the Session Log: `[timestamp] Implementation plan self-approved: [1-line rationale]`. This creates an audit trail.
 
-### OQ-5: Stage gate granularity for PreToolUse
+### OQ-4: Catalog boundary after promotions — DECIDED: Keep catalog, manual activation only (option d)
 
-**Question:** The stage gate hook needs to distinguish "source code edits" from "plan/doc/state edits." The builder legitimately needs to edit CURRENT-STATE.md, plan docs, and roadmap files during non-executing stages. How to draw the line?
+**Decision:** Keep the catalog infrastructure (MANIFEST.md, directory tree, README). Remove all autonomous activation heuristics from the builder. Activation is human-only.
 
-**Options:**
-- (a) Allowlist approach: during non-executing stages, only allow edits to files matching `roadmap/**`, `docs/**`, `CURRENT-STATE.md`, `.github/**`. Block everything else.
-- (b) Blocklist approach: during non-executing stages, block edits to files matching `src/**`, `app/**`, `lib/**`, `tests/**`, `*.py` (non-hook), `*.ts`, `*.js`, etc. Allow everything else.
-- (c) Convention-based: the template establishes that source code lives under `src/` (or a configured path). The hook reads a `source_root` config from CURRENT-STATE.md or copilot-instructions.md.
+**Why:** After promotions, the catalog still has 11 items (2 agents, 4 skills, 1 hook, 2 prompts, 2 patterns). The infrastructure is justified by item count. The MANIFEST.md-as-skill pattern is valuable — any agent can discover available capabilities.
 
-**Recommendation:** Option (c) with fallback to (a). Add a `- **Source Root**: src/` field to Workflow State. The stage gate allows edits only outside the source root during planning stages. Default to `src/` if not specified. This is the most template-friendly approach — different projects have different layouts, and a configurable source root handles that without hardcoding.
+**What changes:**
+- Remove the trigger heuristic table from the builder ("bootstrap → tool-guardrails; 5+ slices → critic; etc.")
+- At bootstrap, builder presents catalog options via `vscode_askQuestions`: "Which optional capabilities do you want? [designer, security-reviewer, ci-gate, ...]"
+- After bootstrap, catalog items are activated manually by the human
 
-### OQ-6: Handling the first phase (no prior state)
+### OQ-5: Stage gate granularity — DECIDED: Allowlist during non-executing stages (option a, refined)
 
-**Question:** On the very first phase after bootstrap, there's no prior implementation to strategically review, no existing patterns for the tester to read, and the design plan is being created from a fresh vision. Should the stage pipeline have a "first phase" mode that skips or simplifies certain stages?
+**Decision:** During non-executing stages, the stage gate allows edits only to `roadmap/**`, `docs/**`, and `.github/**`. Everything else is blocked. During the executing stage, no restriction. Keep `Source Root` field in Workflow State for the tester hook (OQ-1) only.
 
-**Options:**
-- (a) No special handling. The full pipeline runs even for phase 1. Critique may be shallow but the practice is still valuable.
-- (b) Phase 1 uses a simplified pipeline: design plan → critique (1 round) → implementation plan → execute → review → cleanup. Skip implementation critique and strategic review.
-- (c) Phase 1 gets a `first_phase: true` flag in Workflow State. Hooks are more lenient (e.g., strategic review is `n/a` by default).
+**Why:** The original recommendation was (c) with fallback to (a), but on reflection the allowlist is simpler and more robust. During planning/critique stages, the builder only writes to a small, predictable set of paths. An allowlist covers all of them without configuration. The `Source Root` concept is still useful but only for the tester's isolation hook — the stage gate doesn't need it.
 
-**Recommendation:** Option (a). The pipeline shouldn't have special modes — that's complexity without proportional benefit. The critique may be lighter on phase 1, but running it establishes the habit and catches issues even on a fresh codebase. The product-owner's user stories are arguably *most* valuable on phase 1 when there's no existing code to ground decisions.
+**Allowlisted paths during non-executing stages:**
+- `roadmap/**` — plans, CURRENT-STATE.md
+- `docs/**` — architecture, vision, wraps
+- `.github/**` — agents, prompts, instructions (for catalog activation)
 
-### OQ-7: Wrap summary placement and format
+### OQ-6: First phase handling — DECIDED: No special handling (option a)
 
-**Question:** Wrap summaries are proven valuable in wyoclear. Where should they live and what's the minimum viable format for the template?
+**Decision:** The full pipeline runs for every phase, including phase 1. No `first_phase` flag, no simplified mode.
 
-**Options:**
-- (a) `docs/wraps/phase-N-wrap.md` — dedicated directory, one file per phase (wyoclear pattern)
-- (b) Appended to the phase design plan as a final section
-- (c) Written to `/memories/repo/` as session notes (leverages existing memory system)
+**Why:** Special modes are complexity without proportional benefit. The product-owner's user stories are *most* valuable on phase 1. Running critique establishes the pattern early.
 
-**Recommendation:** Option (a). Wraps are distinct from plans (they summarize *what actually happened* vs. *what was planned*) and distinct from session notes (they're phase-level, not session-level). The dedicated directory makes them easy to find and list. The template should include a `docs/wraps/README.md` explaining the format.
+**One refinement:** Allow `n/a` for strategic review on *any* phase where it genuinely doesn't apply (not just phase 1). The builder decides when strategic review is `n/a` and logs reasoning to the Session Log. The session-gate hook accepts `n/a` as valid for strategic review.
+
+### OQ-7: Wrap summary placement — DECIDED: `docs/wraps/` directory (option a)
+
+**Decision:** Wrap summaries live in `docs/wraps/phase-N-wrap.md`, one file per phase.
+
+**Why:** Wraps summarize *what actually happened* vs *what was planned* — they're distinct from plans (b) and distinct from session-level memory notes (c). The dedicated directory makes them easy to find and list.
+
+**Template includes `docs/wraps/README.md`** with this format:
+
+```markdown
+## Phase N: [Title]
+- **Design plan**: link
+- **Implementation plan**: link
+- **Slices completed**: N/M
+- **Key decisions**: ...
+- **What went well**: ...
+- **What surprised us**: ...
+- **Deferred to future phases**: ...
+```
+
+---
+
+### Decision Summary
+
+| OQ | Decision | Risk |
+|----|----------|------|
+| **OQ-1** Tester isolation | PreToolUse hook, allow test files + config, block source | Low — patterns adjustable |
+| **OQ-2** Bootstrap | Self-deleting, ~50 lines, delegate interview to planner | Low — easy to refactor |
+| **OQ-3** Human gates | **Design = session break. Rest = autonomous + logged.** | **High if wrong — but this is the right tradeoff** |
+| **OQ-4** Catalog boundary | Keep catalog, manual activation only | Low — structural |
+| **OQ-5** Stage gate | Allowlist (`roadmap/`, `docs/`, `.github/`) during non-executing stages | Medium — monitor for legitimate blocked edits |
+| **OQ-6** First phase | No special handling, `n/a` allowed for strategic review | Very low |
+| **OQ-7** Wrap placement | `docs/wraps/phase-N-wrap.md` | Very low |
 
 ---
 
