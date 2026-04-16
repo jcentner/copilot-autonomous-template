@@ -1,79 +1,80 @@
 ---
-description: "Complete a phase — update docs, record ADRs, record lessons, mark phase done."
+description: "Run the cleanup checklist: verify criteria, record ADRs, sync docs, write wrap summary, advance to next phase."
 agent: agent
 ---
 
 # Phase Complete
 
-You are completing a development phase for {{ project_name }}. Read the project context:
+You are completing the current phase of {{ project_name }}. This prompt drives the `cleanup` stage of the state machine.
 
-- [Project instructions](../../.github/copilot-instructions.md)
-- [ADR index](../../docs/architecture/decisions/README.md)
-- [Open questions](../../docs/reference/open-questions.md)
-- [Tech debt tracker](../../docs/reference/tech-debt.md)
-- [Glossary](../../docs/reference/glossary.md)
+## Precondition
 
-## Task
+- Read `roadmap/CURRENT-STATE.md`.
+- **Stage** should be `cleanup` (or `reviewing` if strategic review already passed). If earlier, stop and report.
 
-Complete the phase documented at: **${input:phasePlanPath}**
+## Required reads
 
-## Checklist
+- Design plan + implementation plan referenced in CURRENT-STATE.
+- All slice review files (`roadmap/phases/phase-N-review-slice-*.md`).
+- Strategic review (`roadmap/phases/phase-N-strategic-review.md`).
 
-Work through each step:
+## Cleanup checklist — execute in order
 
-### 1. Verify Acceptance Criteria
-- Read the phase plan's acceptance criteria
-- Verify each one is met
-- Note any criteria that were descoped or changed
+### 1. Verify acceptance criteria against the design plan
+- Walk each criterion. Confirm evidence (commit, test, demo).
+- Document any waived criterion in CURRENT-STATE `## Waivers`.
 
-### 2. Update Phase Plan Status
-- Change status from "In Progress" to "Complete"
-- Note any deviations from the original plan
-- Record completion date
+### 2. Record ADRs
+- For each architectural decision made during this phase, create an ADR under `docs/architecture/decisions/`.
+- Update the ADR index.
 
-### 3. Record ADRs
-- Were any significant design decisions made during this phase?
-- Create ADRs in `docs/architecture/decisions/` for each
-- Update the ADR index
+### 3. Update open questions + tech debt + glossary
+- Close answered questions in `docs/reference/open-questions.md`; add new ones discovered.
+- Record shortcuts/compromises in `docs/reference/tech-debt.md`.
+- Add new terms to `docs/reference/glossary.md`.
 
-### 4. Resolve Open Questions
-- Were any open questions from `docs/reference/open-questions.md` answered?
-- Update their status to "Resolved" with the resolution
-- Were new open questions discovered? Add them
+### 4. Sync docs
+- Ensure README, architecture overview, and instructions reflect the codebase as shipped.
+- Grep for stale references to removed/renamed symbols.
 
-### 5. Record Tech Debt
-- Were any shortcuts or compromises made?
-- Add them to `docs/reference/tech-debt.md`
+### 5. Write wrap summary
+- Create `docs/wraps/phase-N-wrap.md` using `docs/wraps/TEMPLATE.md` as the scaffold.
+- Required fields: design plan link, implementation plan link, slices completed (N/M), key decisions (link ADRs), what went well, what surprised us, deferred items.
+- Keep it tight: a future contributor should be able to reconstruct the phase's reasoning in 5 minutes.
 
-### 6. Update Glossary
-- Were new terms introduced? Add to `docs/reference/glossary.md`
+### 6. Save context notes to memory
+- Write or update `/memories/repo/` with patterns, gotchas, failures, and approaches worth carrying into the next phase.
 
-### 7. Check Docs Consistency
-- Do all docs still accurately reflect the codebase after this phase?
-- Specifically check: README, architecture overview
-- Fix any docs-drift introduced during implementation
+### 7. Vision lock updates
+- If learnings adjusted within-scope constraints or priorities, update `docs/vision/VISION-LOCK.md` in place, bump minor version, append changelog entry.
+- If goals/scope changed, **do not** edit the vision lock. Propose updates in CURRENT-STATE under `## Proposed Vision Updates` and set **Stage** to `blocked` with `Blocked Reason: "Vision update needs human review."`.
 
-### 8. Vision Lock Updates
-- Did any learnings during this phase affect the vision goals, constraints, or priorities?
-- If within-scope (new constraint, priority shift, scope clarification) — update the vision lock in place, increment minor version, append changelog entry
-- If scope/goal changes are needed — propose them in `roadmap/CURRENT-STATE.md` under `## Proposed Vision Updates` (do NOT edit the vision lock for these)
+### 8. Complete the Phase Completion Checklist in CURRENT-STATE
+- Check every box in the `## Phase Completion Checklist` section.
+- The session-gate hook blocks session end during `cleanup` until every box is checked.
 
-### 9. Record Lessons Learned
-- What went well?
-- What was harder than expected?
-- What would we do differently next time?
-- Add a "Lessons Learned" section to the phase plan
-
-### 10. Update Roadmap
-- Update `roadmap/README.md` to reflect the completed phase
-- Note any scope changes that affect future phases
+### 9. Advance the state machine
+- Increment **Phase** by 1.
+- Reset Slice Evidence fields: `Tests Written: n/a`, `Tests Pass: n/a`, `Reviewer Invoked: n/a`, `Review Verdict: n/a`, `Critical Findings: 0`, `Major Findings: 0`, `Strategic Review: n/a`, `Committed: n/a`.
+- Reset `Active Slice: 1`, `Slice Total: n/a`.
+- Clear `Design Plan`, `Implementation Plan` (they will be set by next phase's planner).
+- Set `Design Status: n/a`, `Implementation Status: n/a`.
+- Reset `Design Critique Rounds: 0`, `Implementation Critique Rounds: 0`.
+- Set **Stage** to `planning`.
+- Append to Session Log: `- [ISO8601] phase-complete: phase N wrapped, advancing to phase N+1`.
 
 ## Output
 
-Present a summary:
-- Phase completion status
-- ADRs created
-- Open questions resolved/added
-- Tech debt recorded
-- Docs updated
-- Lessons learned
+After the state machine advances, summarize:
+- Phase N status: complete.
+- ADRs created (list).
+- Open questions resolved / added.
+- Tech debt recorded.
+- Wrap summary path.
+- Next phase seed (if any scope is already known).
+
+## Rules
+
+- Do not skip steps. The checklist is the gate.
+- Do not edit the vision lock for goal/scope changes — propose in CURRENT-STATE.
+- Do not mark a criterion as met without evidence.

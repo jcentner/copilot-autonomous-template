@@ -1,52 +1,53 @@
 ---
-description: "Execute an implementation plan — write code, run tests, ask when ambiguous."
+description: "Execute a slice from the current implementation plan using the builder's slice loop."
 agent: agent
 ---
 
 # Implement
 
-You are implementing code for {{ project_name }} following an approved implementation plan. Read the project context:
+You are executing one slice of the approved implementation plan for {{ project_name }}. This prompt is a manual override entry point — the autonomous builder normally drives the slice loop.
 
-- [Project instructions](../../.github/copilot-instructions.md)
-- [Architecture overview](../../docs/architecture/overview.md)
+## Precondition
 
-## Task
+1. Read `roadmap/CURRENT-STATE.md`.
+2. Verify **Stage** is `executing`. If not, stop and report the current stage.
+3. Note the **Active Slice** number and the **Implementation Plan** path.
 
-Execute the implementation plan at: **${input:implementationPlanPath}**
+## Input
 
-## Rules
+Slice number (defaults to **Active Slice** from CURRENT-STATE): **${input:sliceNumber}**
 
-1. **Follow the plan.** Implement in the order specified. Do not skip steps or reorder without asking.
-2. **Ask when ambiguous.** If a step is unclear or you see multiple valid approaches, ask before proceeding. Do not guess.
-3. **Run tests after each component.** Don't wait until the end — verify each piece works.
-4. **Check the checklist.** Mark items as complete in the implementation plan as you go.
-5. **Flag deviations.** If you need to deviate from the plan (e.g., the plan assumed a library API that doesn't exist), explain why and get approval.
-6. **Update docs if needed.** If your implementation changes something documented, update the docs in the same commit. Check for docs-drift.
-7. **Record tech debt.** If you take a shortcut, add it to `docs/reference/tech-debt.md`.
-8. **Record new ADRs.** If a significant design decision is made during implementation, note it for recording as an ADR.
+## Slice loop
 
-## Process
+Execute every step in order. Do not skip or reorder:
 
-For each section of the implementation plan:
+1. **Read the slice** from the implementation plan: files touched, scope, acceptance criteria, test strategy.
+2. **Invoke tester subagent** with the spec. Tester writes tests without reading implementation (hook-enforced).
+3. **Implement the slice** — edit only the files listed in the slice plan. If the slice grows, stop and update the plan first.
+4. **Run tests**. On failure, apply the builder's error recovery: diagnose, fix (up to 2 attempts), otherwise record in `docs/reference/tech-debt.md` and move on.
+5. **Run post-implementation checks** from the implementation plan (stale references, config traces, diagram/prose consistency).
+6. **Invoke reviewer subagent** on changed files. Reviewer writes `Review Verdict` + findings to CURRENT-STATE.
+7. **Fix all Critical and Major findings** before committing.
+8. **Commit**: `type(scope): description` format, one slice per commit.
+9. **Update Slice Evidence** in CURRENT-STATE:
+   - `Tests Written: yes`
+   - `Tests Pass: yes`
+   - `Reviewer Invoked: yes`
+   - `Review Verdict: <pass|needs-fixes|needs-rework>`
+   - `Critical Findings: N`
+   - `Major Findings: N`
+   - `Committed: yes`
+   - Increment `Active Slice`.
 
-1. Read the section requirements
-2. Search the codebase for relevant existing code and patterns
-3. Implement the code
-4. Write/update tests
-5. Run the tests
-6. Fix any failures
-7. Move to the next section
+The Stop hook (`session-gate.py`) blocks session end if Slice Evidence is incomplete during `executing`.
 
-## Quality Standards
+## Autopilot behavior
 
-- Prefer simple, well-tested code over clever abstractions
-- Test both happy paths and edge cases
-- No lint errors in new code
-- Keep changes atomic and reviewable
+Under autopilot, do **not** ask clarifying questions. Make evidence-based decisions, log the rationale to Session Log, and record architectural choices as ADRs. Stage-gate and tool-guardrails hooks remain hard constraints.
 
 ## Do not
 
-- Create files not specified in the implementation plan without asking
-- Add features beyond what the plan specifies
-- Skip tests to move faster
-- Make architecture decisions without checking existing ADRs
+- Edit files outside the slice's declared scope.
+- Commit broken tests.
+- Skip the reviewer on slices touching 3+ files.
+- Advance `Active Slice` before committing.

@@ -2,7 +2,7 @@
 """Stop hook enhancement: CI gate.
 
 Checks that tests have been run and passed before allowing the agent to stop.
-Works alongside slice-gate.py — this adds test verification to the existing
+Works alongside session-gate.py — this adds test verification to the existing
 phase-completion check.
 
 Looks for evidence of test execution in CURRENT-STATE.md's slice checklist.

@@ -1,0 +1,2 @@
+[console_scripts]
+copier = copier.__main__:CopierApp.run

@@ -2,7 +2,7 @@
 
 You are working on **{{ project_name }}**, {{ description }}.
 
-## Project Context
+## Project context
 
 - **Implementation language**: {{ language }}
 - **Description**: {{ description }}
@@ -10,31 +10,87 @@ You are working on **{{ project_name }}**, {{ description }}.
 <!-- TODO: Add project-specific context after generation -->
 <!-- Examples: target environment, key dependencies, primary LLM (if applicable) -->
 
-## Key Architecture Decisions
-
-Before making design choices, check existing [ADRs](docs/architecture/decisions/). Record new significant decisions as ADRs.
-
 ## Documentation
 
 - Vision lock: [docs/vision/VISION-LOCK.md](docs/vision/VISION-LOCK.md) — versioned in place; scope changes require human approval
 - Architecture: [docs/architecture/overview.md](docs/architecture/overview.md)
+- ADRs: [docs/architecture/decisions/](docs/architecture/decisions/)
 - Open questions: [docs/reference/open-questions.md](docs/reference/open-questions.md)
 - Tech debt: [docs/reference/tech-debt.md](docs/reference/tech-debt.md)
 - Glossary: [docs/reference/glossary.md](docs/reference/glossary.md)
 - Stack skills: [.github/skills/](.github/skills/) — technology-specific docs grounding
-- Workflow catalog: [.github/catalog/MANIFEST.md](.github/catalog/MANIFEST.md) — dormant agents, skills, hooks, and patterns that can be activated on demand
+- Workflow catalog: [.github/catalog/MANIFEST.md](.github/catalog/MANIFEST.md) — dormant capabilities activated on demand
 
-## Coding Conventions
+## Workflow state is machine-readable
 
-- Check [open questions](docs/reference/open-questions.md) before making decisions that aren't covered by ADRs. If a question is relevant, resolve it and record the decision.
-- New significant design choices should be recorded as ADRs in `docs/architecture/decisions/`.
+`roadmap/CURRENT-STATE.md` is parsed by hooks. Use the exact field vocabulary — do not paraphrase.
+
+- `Stage` ∈ `bootstrap`, `planning`, `design-critique`, `implementation-planning`, `implementation-critique`, `executing`, `reviewing`, `cleanup`, `blocked`, `complete`.
+- `Design Status` / `Implementation Status` terminal values: `approved`, `revise`, `rethink`, `waived`.
+- `Review Verdict` terminal values: `pass`, `needs-fixes`, `needs-rework`, `n/a`.
+- `Strategic Review` terminal values: `pass`, `replan`, `n/a`.
+
+Writing a non-terminal value into a terminal field (e.g., `Review Verdict: pending`) will be caught by the SubagentStop hook.
+
+## Three enforcement tiers — know what's actually enforced
+
+**Don't describe a rule as enforced if hooks can't check it.**
+
+### Tier 1 — Hook-enforced
+
+- `stage-gate.py` (PreToolUse) blocks direct `edit` / `create_file` / `multi_replace_string_in_file` tool calls to paths outside the allowlist for non-executing stages. Terminal-based source edits (e.g., `echo ... > src/x.py` via `run_in_terminal`) can bypass this per-call.
+- `session-gate.py` (Stop) is the **backstop** for the terminal bypass: it runs `git diff --name-only HEAD` at session end and blocks `Stop` if source files changed during a non-executing stage. Terminal source edits are therefore detected at session end, not per command.
+- `tool-guardrails.py` (PreToolUse) blocks known-destructive commands (`git push --force`, `rm -rf` on critical paths, `git reset --hard`, writes to `node_modules/`/`.env`). Denylist-based — novel destructive patterns can slip through.
+- `tester-isolation.py` (PreToolUse, tester-scoped) denies `semantic_search`/`codebase` entirely and path-gates reads/searches to tests and config files only.
+- `subagent-verdict-check.py` (SubagentStop, critic/product-owner/reviewer) verifies that the subagent wrote a terminal value into the appropriate CURRENT-STATE field. It cannot verify *quality* — only presence.
+- `evidence-tracker.py` (PostToolUse) logs tool calls for context without mutating state.
+- `context-pressure.py` (PostToolUse) emits an advisory when context usage is high.
+
+### Tier 2 — Artifact-verified, quality not checked
+
+Hooks confirm artifacts exist (design plan has a User Stories section, review files exist, counts are numeric). They do **not** check that the critique was deep, the tests were meaningful, or the strategic review was thorough. That is the agent's job.
+
+### Tier 3 — Advisory only
+
+Code style, commit message format, choice of subagent vs. inline work, error-recovery strategy. The copilot-instructions describe best practices here; nothing blocks deviations.
+
+## Execution modes
+
+- **Autopilot**: the builder self-approves plan advancement and logs rationale to `Session Log`. The single hard human gate is **design plan approval** — always forces a session break via `Stage: blocked`. Under autopilot, do not ask clarifying questions; make evidence-based decisions and log them. Tool-guardrails and stage-gate hooks remain hard constraints.
+- **Manual**: the builder uses `vscode_askQuestions` at checkpoints (design approval, implementation plan approval, phase review). Hooks still apply.
+
+The only bootstrap-time override: greenfield bootstrap must interview the human. That is the sole stage where "don't ask clarifying questions" is waived.
+
+## Coding conventions
+
+- Check [open questions](docs/reference/open-questions.md) before making decisions not covered by ADRs. If a question is relevant, resolve it and record the decision.
+- Record significant design choices as ADRs in `docs/architecture/decisions/`.
 - Use the [tech debt tracker](docs/reference/tech-debt.md) for known compromises.
 - When introducing new terms, add them to the [glossary](docs/reference/glossary.md).
 - Prefer simple, well-tested code over clever abstractions.
 - Every design choice should have a reason.
+- When adopting a new technology, create a stack skill in `.github/skills/` before writing non-trivial implementation code using it.
 
-## Quality Standards
+## Quality standards
 
-- Test coverage should include both happy paths and edge cases.
-- All external actions should require explicit human approval.
+- Test coverage includes both happy paths and edge cases.
+- Input validation at all system boundaries.
+- No hardcoded secrets, tokens, or credentials.
+- Parameterize queries; escape shell and template output.
+- Commit format: `type(scope): description` (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`).
 <!-- TODO: Add project-specific quality standards -->
+
+## Authority hierarchy
+
+1. `docs/vision/VISION-LOCK.md`
+2. ADRs in `docs/architecture/decisions/`
+3. Architecture docs
+4. Roadmap + phase plans
+5. Open questions, tech debt
+6. Instructions and prompts
+
+Higher beats lower. Raise conflicts — never silently work around them.
+
+## Self-modification
+
+The builder does **not** edit its own instructions, prompts, or hook scripts during a phase. If a workflow improvement becomes obvious, append it to `## Proposed Workflow Improvements` in CURRENT-STATE and `docs/reference/agent-improvement-log.md`. Humans apply improvements between phases.

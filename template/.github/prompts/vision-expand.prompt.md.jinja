@@ -97,26 +97,22 @@ Follow the existing structure. Set:
 
 The new vision should build on what exists, not pretend the project is starting over.
 
-### 3. Define next phase — `roadmap/phases/`
+### 3. Advance the state machine
 
-Create the next phase plan:
-- Goals from the new vision, broken into implementable slices
-- Acceptance criteria per goal
-- Dependencies on existing code, new tech, or architecture changes
-- Flag any tech debt that must be resolved first
+Update `roadmap/CURRENT-STATE.md`:
+- **Stage**: `planning` (the next session's planner will produce `phase-N+1-design.md`)
+- Clear `Design Plan`, `Implementation Plan`, set `Design Status: n/a`, `Implementation Status: n/a`.
+- If the current Stage was `complete` or `blocked`, reset `Blocked Reason: n/a`.
+- Append Session Log: `- [ISO8601] vision-expand: archived v{N}, wrote v{N+1}, ready for phase <next-phase-number>`.
 
-### 4. Update Current State — `roadmap/CURRENT-STATE.md`
+Do **not** create a phase plan inline — that is the planner's job on the next session once Stage is `planning`.
 
-Set:
-- **Phase Status**: `In Progress`
-- **Current Phase**: Phase N+1
-- **Next Action**: Begin implementation
-- **Decisions Made**: Key decisions from this brainstorm (with reasoning)
+### 4. Catalog re-evaluation
 
-### 5. Stack skills and catalog
+If new project characteristics surfaced (e.g., the project now has a frontend, or now handles payments), re-run catalog selection:
+- Use `vscode_askQuestions` with options from `.github/catalog/MANIFEST.md`.
+- The human, not the builder, picks which catalog items to activate. Do not apply heuristics autonomously.
 
-- New technologies discussed? Create stack skills.
-- New project characteristics (e.g., now has frontend, now handles payments)? Re-evaluate `.github/catalog/MANIFEST.md` and activate matching items.
 
 ## Tips
 

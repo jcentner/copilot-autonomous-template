@@ -1,73 +1,84 @@
 ---
-description: "Create a file-by-file implementation checklist from a phase planning doc."
-agent: agent
+description: "Produce a file-by-file implementation plan from an approved design plan."
+agent: planner
 ---
 
 # Implementation Plan
 
-You are creating a detailed implementation plan for a {{ project_name }} development phase. Read the project context:
+You are converting an approved design into a slice-by-slice implementation plan for {{ project_name }}.
 
-- [Project instructions](../../.github/copilot-instructions.md)
+## Precondition (hard gate)
+
+Before producing anything:
+
+1. Read `roadmap/CURRENT-STATE.md`.
+2. Verify **Design Status** is `approved` or `waived`. If it is `draft`, `in-critique`, `revise`, or `rethink`, **stop** and report: "Design Status is `<value>` — design must be approved before implementation planning."
+3. Verify **Design Plan** field points to an existing file. If not, stop and report.
+
+Do not proceed past this gate. The critic's SubagentStop hook protects the design stage; this prompt protects the handoff.
+
+## Required reads
+
+- The design plan referenced in CURRENT-STATE **Design Plan**
 - [Architecture overview](../../docs/architecture/overview.md)
 - [Open questions](../../docs/reference/open-questions.md)
+- Relevant ADRs under `docs/architecture/decisions/`
 
 ## Task
 
-Create a file-by-file implementation checklist for: **${input:phasePlanPath}**
+Write `roadmap/phases/phase-N-implementation.md` where `N` matches CURRENT-STATE **Phase**.
 
-Read the phase plan document first.
-
-## Steps
-
-1. **Read the phase plan** thoroughly. Ensure all open questions marked as "must resolve before implementation" have been resolved.
-2. **Analyze the codebase** — search for existing code, patterns, and conventions that this phase needs to integrate with.
-3. **Create the implementation plan** with these sections:
-
-### Implementation Plan Template
+### Required structure
 
 ```markdown
-# Implementation Plan: Phase N — [Title]
+# Implementation Plan: Phase N — <Title>
+
+## Design Reference
+Approved design: [phase-N-design.md](./phase-N-design.md) — as of CURRENT-STATE.
 
 ## Prerequisites
-- [ ] Open question OQ-NNN resolved
-- [ ] Dependencies installed/available
+- [ ] All open questions marked `must resolve before implementation` are resolved.
+- [ ] Dependencies installed / available.
 
-## Implementation Order
-(List files/modules in dependency order — implement leaves first)
+## Slice Plan
 
-### 1. [Component/Module Name]
+For each slice in the design's Slice Breakdown, expand:
 
-**Files to create/modify:**
-- `path/to/file` — Description of what to create/change
-  - [ ] Step 1: specific task
-  - [ ] Step 2: specific task
+### Slice M — <name>
 
-**Tests:**
-- `tests/path/to/test_file` — What to test
-  - [ ] Test case 1: description
-  - [ ] Test case 2: description (edge case)
-
-### 2. [Next Component]
-...
+- **Files touched**: list with path + verb (create/modify/delete).
+- **Scope**: one-paragraph summary of what lands in this slice.
+- **Acceptance criteria** (from design): copy the criterion(ia) this slice satisfies.
+- **Test strategy**: unit / integration / e2e / manual, with file paths for test locations.
+- **Dependencies**: other slices or external work that must precede this one.
 
 ## Integration Steps
-- [ ] Step 1: Wire components together
-- [ ] Step 2: End-to-end test
+Steps that span multiple slices (wiring, migrations, config rollout).
 
-## Verification
-- [ ] All unit tests pass
-- [ ] Integration test passes
-- [ ] Acceptance criteria from phase plan met
-- [ ] No new lint errors introduced
-- [ ] Docs updated if code changed documented behavior
+## Post-Implementation Checks
+What the builder must verify before invoking the reviewer.
+- [ ] Stale references grep (search for old names/paths removed).
+- [ ] Config traces: every configurable value referenced end-to-end.
+- [ ] Diagram/prose consistency: architecture docs match what was built.
+- [ ] All unit + integration tests pass.
+- [ ] Acceptance criteria from the design plan verified.
 ```
 
-4. **Save** the implementation plan alongside the phase plan (e.g., `roadmap/phases/phase-N-implementation.md`)
+## After writing
 
-## Important
+Update `roadmap/CURRENT-STATE.md`:
 
-- Be specific about file paths and what each file should contain.
-- Order by dependency — implement foundations before consumers.
-- Include test cases for both happy paths and edge cases.
-- Flag any new open questions or design decisions that surfaced during planning.
-- Do not write any code yet — that's for `/implement`.
+- Set **Implementation Plan** to the new file path.
+- Set **Implementation Status** to `draft`.
+- Append to Session Log: `- [ISO8601] implementation-plan: draft written to <path>`.
+
+## Handoff
+
+Hand off to **critic** for adversarial review (max 2 rounds). On approve, the builder will set Stage to `executing`.
+
+## Rules
+
+- Do not write code. This is a planning artifact.
+- Be specific: vague plans cause slice loops to stall.
+- Order slices by dependency; leaves first.
+- Every acceptance criterion in the design must map to at least one slice.

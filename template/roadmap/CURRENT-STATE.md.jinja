@@ -1,32 +1,76 @@
 # {{ project_name }} — Current State
 
-**Phase Status**: Not Started
+<!--
+  This file is machine-readable. Hooks parse the fields below to enforce the stage pipeline.
+  Use the exact vocabulary — do not paraphrase values.
 
-## What Exists
+  Stage vocabulary (one of):
+    bootstrap | planning | design-critique | implementation-planning |
+    implementation-critique | executing | reviewing | cleanup | blocked | complete
 
-- `.github/` — Copilot agents, prompts, hooks, and instructions for autonomous development
-- `docs/` — Documentation skeleton (vision, architecture, ADRs, reference docs)
-- `roadmap/` — Roadmap structure with checkpoint protocol
-- `AGENTS.md` — Cross-agent instructions (Copilot, Claude Code, etc.)
+  Status vocabulary (Design Status, Implementation Status):
+    n/a | draft | in-critique | approved | revise | rethink | waived
 
-## Current Phase
+  Slice Evidence value vocabulary:
+    yes | no | pending | n/a
 
-Phase 0: Create the locked vision baseline and bootstrap stack skills.
+  Review Verdict vocabulary:
+    pending | pass | needs-fixes | needs-rework | n/a
 
-## Next Action
+  Strategic Review vocabulary:
+    pending | pass | replan | n/a
+-->
 
-Start the autonomous builder. It will read `BOOTSTRAP.md` in the project root, which detects whether this is a greenfield or existing project and walks through everything needed.
+## Workflow State
 
-After bootstrap completes, `BOOTSTRAP.md` is deleted and this file is updated with Phase 1 details.
+- **Stage**: bootstrap
+- **Phase**: 0
+- **Phase Title**: Bootstrap
+- **Source Root**: src/
+- **Design Plan**: n/a
+- **Design Status**: n/a
+- **Design Critique Rounds**: 0
+- **Implementation Plan**: n/a
+- **Implementation Status**: n/a
+- **Implementation Critique Rounds**: 0
+- **Active Slice**: n/a
+- **Slice Total**: n/a
+- **Blocked Reason**: n/a
 
-## Blocked / Unresolved
+## Slice Evidence
 
-Nothing yet.
+- **Tests Written**: n/a
+- **Tests Pass**: n/a
+- **Reviewer Invoked**: n/a
+- **Review Verdict**: n/a
+- **Critical Findings**: 0
+- **Major Findings**: 0
+- **Strategic Review**: n/a
+- **Committed**: n/a
 
-## Decisions Made
+## Phase Completion Checklist
 
-- Autonomous development workflow adopted via copilot-autonomous-template
+- [ ] All acceptance criteria verified
+- [ ] ADRs recorded for new decisions
+- [ ] Open questions resolved or flagged
+- [ ] Tech debt documented
+- [ ] Docs synced (README, architecture, instructions)
+- [ ] Wrap summary written
+- [ ] Context notes saved to /memories/repo/
+- [ ] CURRENT-STATE updated for next phase
 
-## Files Modified This Session
+## Waivers
 
-- All files generated from template
+(Human-approved exceptions to the normal flow. None yet.)
+
+## Proposed Workflow Improvements
+
+(Builder writes improvement suggestions here. Humans review and apply manually — the builder does not self-modify.)
+
+## Session Log
+
+<!-- Hooks and agents append `- [ISO8601 timestamp] <event>` lines here. -->
+
+## Context
+
+Bootstrap mode. `BOOTSTRAP.md` in the project root walks through greenfield vs existing detection, vision lock creation, and phase 1 design plan setup. After bootstrap completes, it deletes itself and this file is updated with Phase 1 details.

@@ -1,0 +1,91 @@
+---
+description: "Produce a design plan for the next phase: user stories, acceptance criteria, non-goals, risks, ADR candidates, test strategy, slice breakdown."
+agent: planner
+---
+
+# Design Plan
+
+You are drafting the design plan for the next phase of {{ project_name }}. The autonomous builder normally runs this, but you can invoke it manually from any stage.
+
+## Required reads
+
+- [Current state](../../roadmap/CURRENT-STATE.md) — parse `Phase`, `Stage`, open slice evidence
+- [Vision lock](../../docs/vision/VISION-LOCK.md) — authoritative scope
+- [Roadmap](../../roadmap/README.md)
+- [Open questions](../../docs/reference/open-questions.md) — flag blockers
+- [ADR index](../../docs/architecture/decisions/README.md)
+
+## Input
+
+Phase description: **${input:phaseDescription}**
+
+## Task
+
+Write `roadmap/phases/phase-N-design.md` (where `N` = next phase from CURRENT-STATE). The file **must** contain every section below, in this order.
+
+### Required structure
+
+```markdown
+# Phase N: <Title>
+
+## Status
+draft | in-critique | approved | waived
+
+## Goal
+One paragraph: what this phase delivers and why.
+
+## User Stories
+_(populated by product-owner handoff; leave as `(to be populated by product-owner)` if not yet invoked)_
+
+- **As a** <user> **I want to** <capability> **so that** <outcome>.
+
+## Acceptance Criteria
+Measurable outcomes per story.
+- [ ] Criterion 1 (observable, verifiable)
+- [ ] Criterion 2
+
+## Non-Goals
+Explicit exclusions to prevent scope creep.
+- Not doing X because Y.
+
+## Risks
+- **Risk**: description — **Mitigation**: approach.
+
+## ADR Candidates
+Decisions in this phase that warrant capture in `docs/architecture/decisions/`.
+- ADR-NNN (proposed): <decision title> — captures choice between A vs B.
+
+## Test Strategy
+Map each acceptance criterion to a test layer.
+- Unit: ...
+- Integration: ...
+- End-to-end: ...
+- Manual: ...
+
+## Slice Breakdown
+Ordered, independently-shippable slices with file-level hints.
+1. **Slice 1 — <name>**: files touched, scope, tests to write.
+2. **Slice 2 — <name>**: ...
+```
+
+## After writing
+
+Update `roadmap/CURRENT-STATE.md`:
+
+- Set **Design Plan** to the file path (`roadmap/phases/phase-N-design.md`).
+- Set **Design Status** to `draft`.
+- Append to Session Log: `- [ISO8601] design-plan: draft written to <path>`.
+
+## Handoff
+
+When the draft is complete, hand off to:
+
+- **product-owner** — to populate the User Stories section.
+- **critic** — for adversarial review (only after product-owner if applicable).
+
+## Rules
+
+- Do **not** make implementation decisions here — that's `/implementation-plan`.
+- Flag unresolved blockers in `docs/reference/open-questions.md`; do not paper over them.
+- Do not edit source code. Your scope is plan files + CURRENT-STATE.
+- Respect authority order: VISION-LOCK > ADRs > architecture > roadmap. If this phase would contradict a higher doc, raise it instead of silently working around it.

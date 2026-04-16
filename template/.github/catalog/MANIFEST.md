@@ -9,6 +9,8 @@ Available capabilities that can be activated by the autonomous builder or manual
 
 ## Agents
 
+> **Note:** `critic` and `product-owner` were promoted to **core agents** (shipped by default in `.github/agents/`). They are no longer catalog items — activation is automatic.
+
 ### designer
 
 | Field | Value |
@@ -19,16 +21,6 @@ Available capabilities that can be activated by the autonomous builder or manual
 | Requires | `DESIGN.md` pattern (auto-install if missing) |
 | Description | Establishes and enforces visual design system via DESIGN.md. Reviews UI changes for consistency. Uses `browser` tools for visual verification when available (requires `workbench.browser.enableChatTools`). |
 
-### product-owner
-
-| Field | Value |
-|-------|-------|
-| Source | `catalog/agents/product-owner.agent.md` |
-| Activates to | `.github/agents/product-owner.agent.md` |
-| Trigger | Phase planning when user stories or acceptance criteria are absent, or builder encounters ambiguous requirements |
-| Requires | None |
-| Description | Writes user stories with acceptance criteria, maps user journeys, validates that implementation matches user expectations. Uses `browser` tools for visual acceptance testing when available. |
-
 ### security-reviewer
 
 | Field | Value |
@@ -38,16 +30,6 @@ Available capabilities that can be activated by the autonomous builder or manual
 | Trigger | Project handles authentication, payments, PII, or external APIs. Grep for: `auth`, `login`, `password`, `token`, `secret`, `payment`, `stripe`, `oauth` |
 | Requires | None |
 | Description | Dedicated OWASP Top 10 review, secrets detection, auth/authz audit. Deeper than the generic reviewer's security checks. |
-
-### critic
-
-| Field | Value |
-|-------|-------|
-| Source | `catalog/agents/critic.agent.md` |
-| Activates to | `.github/agents/critic.agent.md` |
-| Trigger | Phase planning for phases with 5+ slices, or when planner produces plans touching 10+ files |
-| Requires | None |
-| Description | Challenges implementation plans before coding starts. Identifies assumptions, missing edge cases, and scope risks. RALPLAN-style adversarial review. |
 
 ## Skills
 
@@ -89,14 +71,9 @@ Available capabilities that can be activated by the autonomous builder or manual
 
 ## Hooks
 
-### tool-guardrails
-
-| Field | Value |
-|-------|-------|
-| Source | `catalog/hooks/tool-guardrails.json` |
-| Activates to | `.github/hooks/tool-guardrails.json` |
-| Trigger | Always recommended — activate during bootstrap |
-| Description | PreToolUse guards: block `git push --force`, `git reset --hard`, protect critical files from deletion, block writes to `node_modules/`. |
+> Note: `tool-guardrails` and `context-checkpoint` were promoted to core hooks
+> (see `.github/hooks/scripts/tool-guardrails.py` and `context-pressure.py`).
+> They are always active — no activation needed.
 
 ### ci-gate
 
@@ -106,15 +83,6 @@ Available capabilities that can be activated by the autonomous builder or manual
 | Activates to | `.github/hooks/scripts/ci-gate.py` + reference in builder agent hooks |
 | Trigger | Project has GitHub Actions workflows |
 | Description | Stop hook enhancement: blocks session stop unless local tests have been verified as passing in the current slice. |
-
-### context-checkpoint
-
-| Field | Value |
-|-------|-------|
-| Source | `catalog/hooks/context-checkpoint.py` |
-| Activates to | `.github/hooks/scripts/context-checkpoint.py` + reference in builder agent hooks |
-| Trigger | Long-running sessions expected (complex phases, 10+ slices) |
-| Description | PostToolUse hook that tracks accumulated tool I/O. Advises the builder to checkpoint and consider wrapping up when context pressure is high. |
 
 ## Prompts
 
@@ -167,3 +135,13 @@ When the catalog doesn't have what you need, these vetted external sources can b
 | awesome-design-md | 66 DESIGN.md files extracted from real brand websites | https://github.com/VoltAgent/awesome-design-md |
 | anthropic/skills | Official community skills (frontend-design, doc-coauthoring) | https://github.com/anthropics/skills |
 | oh-my-githubcopilot | Workflow patterns: ultraqa, deep-interview, ralph loops, MCP tools | https://github.com/jmstar85/oh-my-githubcopilot |
+
+## Activation model
+
+Catalog items are **activated manually by the human at bootstrap** (or at phase start). `BOOTSTRAP.md` prompts the human with a `vscode_askQuestions` picker listing every catalog item by type. The builder does not apply trigger heuristics autonomously — triggers in the tables above are advisory hints for the human picker.
+
+Activation = copying the file from `.github/catalog/<type>/` to `.github/<type>/`. Deactivation is a plain delete.
+
+## Changelog
+
+- **2026-04 (v2 restructure)** — `critic` and `product-owner` promoted to core agents. `tool-guardrails` and `context-pressure` (née `context-checkpoint`) promoted to core hooks. Remaining catalog items: 2 agents, 4 skills, 1 hook, 2 prompts, 2 patterns.

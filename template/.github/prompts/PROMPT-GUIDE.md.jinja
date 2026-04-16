@@ -37,36 +37,41 @@ For fully autonomous sessions, enable these VS Code settings:
 
 ## Manual Override Prompts
 
-These prompts are available for human-driven sessions when you want direct control over a specific step. Type `/` in Chat to invoke them.
+Prompts are **human override entry points**. The autonomous builder orchestrates the full pipeline; you invoke prompts directly only when driving a single step manually or recovering from an interrupted run. Type `/` in Chat to invoke.
 
-| Prompt | What It Does | When to Use |
-|--------|--------------|-------------|
-| `/vision-expand` | Interactive brainstorm for what's next after current vision is fulfilled | Vision complete, planning next directions |
-| `/phase-plan` | Create a phase planning doc with features, dependencies, acceptance criteria | Starting a new phase manually |
-| `/implementation-plan` | Create a file-by-file implementation checklist from a phase doc | Detailed planning before coding |
-| `/implement` | Execute an implementation plan step-by-step | Implementing from an approved plan |
-| `/code-review` | Review code for quality, architecture, and security | After changes, before merging |
-| `/phase-complete` | Update docs, record ADRs and lessons, mark phase done | Wrapping up a phase |
+| Prompt | What it does | Stage it fits | Agent |
+|--------|--------------|---------------|-------|
+| `/vision-expand` | Brainstorm next directions after current vision is fulfilled | `complete` / post-vision | agent |
+| `/design-plan` | Produce user stories, acceptance criteria, non-goals, risks, ADR candidates, test strategy, slice breakdown | `planning` | planner |
+| `/implementation-plan` | Convert an approved design into a file-by-file slice plan | `implementation-planning` | planner |
+| `/implement` | Execute one slice of the approved implementation plan via the slice loop | `executing` | agent |
+| `/code-review` | Code-focused review: architecture, quality, tests, docs-sync, security | `executing` (per slice) / `reviewing` | reviewer |
+| `/strategic-review` | Validate shipped phase against design intent + acceptance criteria | `reviewing` | product-owner |
+| `/phase-complete` | Cleanup checklist: ADRs, docs, wrap summary, advance state machine | `cleanup` | agent |
+
+Each prompt reads and writes machine-readable fields in `roadmap/CURRENT-STATE.md`. SubagentStop and PreToolUse hooks verify that writes happened correctly.
 
 ## Custom Agents
 
-| Agent | Role | Tools | Used As |
+### Core (shipped by default)
+
+| Agent | Role | Tools | Used as |
 |-------|------|-------|---------|
-| `autonomous-builder` | Continuous build loop | All tools + Stop hook | Primary agent |
-| `planner` | Research and analysis | Read-only (search, web, codebase) | Subagent of builder |
-| `reviewer` | Code review + security | Read-only + terminal output | Subagent of builder |
-| `tester` | Write tests from specs | All tools (hidden from picker) | Subagent of builder |
+| `autonomous-builder` | Stage orchestrator; dispatches subagents by stage | All tools + Stop hook | Primary agent |
+| `planner` | Design plans, implementation plans, revisions, strategic-review fallback | Read + plan-file writes | Subagent |
+| `critic` | Adversarial review of design + implementation plans | Read + plan-file writes | Subagent |
+| `product-owner` | User stories (design mode) / strategic review (review mode) | Read + plan-file writes | Subagent |
+| `reviewer` | Code review + security + docs-sync | Read + state writes | Subagent |
+| `tester` | Writes tests from spec without reading implementation | Scoped via `tester-isolation.py` | Subagent |
 
-### Catalog Agents (activated on demand)
+### Catalog agents (activated on demand)
 
-These agents live in `.github/catalog/agents/` and are activated by the builder when project characteristics match their trigger conditions. See `.github/catalog/MANIFEST.md` for triggers and details.
+Live in `.github/catalog/agents/`. Activated by the builder when project characteristics match. See `.github/catalog/MANIFEST.md`.
 
 | Agent | Role | Trigger |
 |-------|------|---------|
 | `designer` | Visual design system via DESIGN.md | Project has frontend/UI code |
-| `product-owner` | User stories + acceptance criteria | Phase planning with missing user stories |
 | `security-reviewer` | OWASP, secrets, auth/authz audit | Project handles auth, payments, or PII |
-| `critic` | Challenges plans before coding | Phase has 5+ slices |
 
 Agents support **handoffs** — the planner has a button to hand off to implementation, the reviewer has a button to hand off to fix issues.
 
@@ -83,15 +88,21 @@ Agents support **handoffs** — the planner has a button to hand off to implemen
 │  │          │  │  spec)   │  │                │ │
 │  └─────────┘  └──────────┘  └────────────────┘ │
 │                                                 │
-│  Catalog agents (activated on demand):          │
-│  designer · product-owner · security-reviewer   │
-│  critic                                         │
+│  Core subagents: planner · critic · product-    │
+│  owner · reviewer · tester                      │
 │                                                 │
-│  Stop hook: slice-gate.py                       │
-│  (enforces review + prevents premature stop)    │
+│  Catalog agents (activated on demand):          │
+│  designer · security-reviewer                   │
+│                                                 │
+│  Hooks:                                         │
+│    PreToolUse: stage-gate · tool-guardrails     │
+│    PostToolUse: evidence-tracker · context-     │
+│                 pressure                        │
+│    Stop:         session-gate                   │
+│    SubagentStop: subagent-verdict-check         │
 └─────────────────────────────────────────────────┘
 
-Manual overrides: /vision-expand  /phase-plan  /implementation-plan  /implement  /code-review  /phase-complete
+Manual overrides: /vision-expand  /design-plan  /implementation-plan  /implement  /code-review  /strategic-review  /phase-complete
 ```
 
 ## How Prompts & Agents Work
@@ -111,5 +122,6 @@ Manual overrides: /vision-expand  /phase-plan  /implementation-plan  /implement 
 - **Prompt doesn't appear in `/` menu?** — Check file is in `.github/prompts/` with `.prompt.md` extension.
 - **Agent can't find files?** — Don't add a `tools` field unless restricting. Default agent has full access.
 - **Stop hook not firing?** — Enable `chat.useCustomAgentHooks: true` in VS Code settings.
-- **Agent stops prematurely?** — The Stop hook should block this. Check that `slice-gate.py` exists and is executable.
+- **Agent stops prematurely?** — The Stop hook should block this. Check that `session-gate.py` exists and is executable.
+- **Subagent returned without updating state?** — The `subagent-verdict-check.py` hook should block this. Check it is registered in the subagent's frontmatter and that `chat.useCustomAgentHooks: true`.
 - **Diagnostics** — Right-click in Chat view → Diagnostics to see all loaded prompts, agents, and errors.

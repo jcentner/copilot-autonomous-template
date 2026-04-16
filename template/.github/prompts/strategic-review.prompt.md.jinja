@@ -1,0 +1,83 @@
+---
+description: "Strategic post-implementation review: did what shipped match the design's intent and acceptance criteria?"
+agent: product-owner
+---
+
+# Strategic Review
+
+You are validating that the implementation of the current phase of {{ project_name }} matches the design's intent. This complements `/code-review` (which is code-quality only).
+
+If the **product-owner** agent is not active in this repo, the **planner** performs this role as a fallback.
+
+## Precondition
+
+- Read `roadmap/CURRENT-STATE.md`.
+- Verify **Stage** is `reviewing` (or `cleanup` if catching up late). If earlier, stop and report the stage.
+- Note the **Design Plan** and **Implementation Plan** paths.
+
+## Required reads
+
+- The approved design plan (for acceptance criteria + user stories).
+- The implementation plan (for slice-level scope).
+- Slice review files under `roadmap/phases/phase-N-review-slice-*.md`.
+- The phase's commit range (`git log phase-N-start..HEAD`).
+
+## Questions to answer
+
+1. **Acceptance criteria** — were all criteria from the design plan met? Which ones are only partially met?
+2. **User stories** — do the shipped capabilities satisfy the stories? Any stories silently dropped?
+3. **Invalidated assumptions** — did any test result, user story revision, or external change invalidate a design assumption?
+4. **Emergent constraints** — are there newly-discovered constraints (perf, security, UX, integration) that warrant a vision update or a new ADR?
+5. **Scope drift** — did the implementation add or drop non-trivial scope vs. the design? Was it recorded?
+
+## Output
+
+Write `roadmap/phases/phase-N-strategic-review.md`:
+
+```markdown
+# Phase N — Strategic Review
+
+**Design reference**: link.
+**Implementation reference**: link.
+
+## Acceptance Criteria
+| Criterion | Met? | Evidence |
+|-----------|------|----------|
+| ...       | yes/no/partial | commit/test/doc |
+
+## User Stories
+| Story | Satisfied? | Notes |
+|-------|------------|-------|
+
+## Invalidated Assumptions
+- ...
+
+## Emergent Constraints
+- ...
+
+## Scope Drift
+- Added: ...
+- Dropped: ...
+
+**Verdict**: pass | replan | n/a
+**Rationale**: one sentence.
+```
+
+Verdict rules:
+- `pass` — all criteria met or consciously waived; no invalidated assumptions.
+- `replan` — criteria missed, or new constraints invalidate the design; recommend a new phase or ADR.
+- `n/a` — this phase has no user-facing surface (pure refactor, infra-only).
+
+## Update CURRENT-STATE
+
+Set **Strategic Review** to `pass`, `replan`, or `n/a` (the SubagentStop hook verifies this terminal value).
+
+Append to Session Log: `- [ISO8601] strategic-review: <verdict> — <one-line rationale>`.
+
+If verdict is `replan`, set **Blocked Reason** to summarize the replan and let the builder transition to `blocked` for human review.
+
+## Rules
+
+- Do not modify source. You report; the builder adjusts.
+- Do not relitigate code quality — that's `/code-review`.
+- Be honest about partial satisfaction; `partial` on a criterion is not a failure, it is information.

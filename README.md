@@ -2,22 +2,21 @@
 
 A [copier](https://copier.readthedocs.io/) template for bootstrapping an autonomous AI development workflow using GitHub Copilot.
 
-## What You Get
+> **v2 (April 2026)** — major restructure around a hook-verified stage machine. See [`tmp/v2-proposal.md`](tmp/v2-proposal.md) and phase plans `tmp/phase-{a,b,c,d}-plan.md` for the design. The workflow now runs as `bootstrap → planning → design-critique → implementation-planning → implementation-critique → executing → reviewing → cleanup`, with SubagentStop hooks verifying that critic/product-owner/reviewer write their verdicts to `CURRENT-STATE.md` before returning.
+
+## What you get
 
 This template creates a complete `.github/` setup for autonomous development:
 
-- **Autonomous builder agent** — a build loop that plans, implements, tests, reviews, and checkpoints
-- **Reviewer subagent** — code review + security with restricted read-only tools + handoff to fix
-- **Planner subagent** — research and planning with read-only tools + handoff to implement
-- **Tester subagent** — writes tests from specs before seeing implementation (context isolation)
-- **Stop hook** — deterministic enforcement that prevents premature stopping and skipped reviews
-- **Stack skills scaffold** — auto-created skills that ground agents in official docs for each technology
-- **5 manual override prompts** — plan, detail, implement, review, complete
-- **AGENTS.md** — cross-agent instructions (works with Copilot, Claude Code, etc.)
-- **Documentation skeleton** — vision lock (versioned living document), ADRs, open questions, tech debt, glossary
-- **Roadmap structure** — checkpoint-based cross-session continuity with machine-readable status
-- **Workflow catalog** — dormant agents, skills, hooks, prompts, and patterns that the builder activates on demand when project needs match trigger conditions (4 agents, 4 skills, 3 hooks, 2 prompts, 2 patterns)
-- **Prompt guide** — how to use the workflow (for humans)
+- **Autonomous builder agent** — stage orchestrator that dispatches subagents based on `Stage` in `CURRENT-STATE.md`.
+- **6 core subagents** — `planner`, `critic`, `product-owner`, `reviewer`, `tester`, plus `Explore` for read-only research.
+- **Hook-enforced state machine** — `stage-gate` (edits gated by stage), `session-gate` (Stop backstop for terminal bypass), `tool-guardrails` (destructive-command denylist), `subagent-verdict-check` (SubagentStop state verification), `tester-isolation` (tester can't read implementation), `evidence-tracker`, `context-pressure`.
+- **7 manual-override prompts** — `/design-plan`, `/implementation-plan`, `/implement`, `/code-review`, `/strategic-review`, `/phase-complete`, `/vision-expand`.
+- **Workflow catalog** — dormant capabilities activated by the human at bootstrap (2 agents, 4 skills, 1 hook, 2 prompts, 2 patterns).
+- **`AGENTS.md`** — cross-agent instructions recognized by Copilot, Claude Code, and other AI agents.
+- **Documentation skeleton** — vision lock (versioned living document), ADRs, open questions, tech debt, glossary, phase wraps.
+- **Roadmap structure** — checkpoint-based cross-session continuity with machine-readable fields hooks can parse.
+- **Test suite** — 91 unit tests for hooks + smoke test for generated output.
 
 ## Usage
 

@@ -15,4 +15,9 @@ Changes to Copilot instructions, prompts, agents, and workflow files. Each entry
 
 ## Entries
 
-<!-- Entries are added by the autonomous builder when it modifies dev workflow files -->
+<!--
+  The autonomous builder does not self-modify. When it spots a workflow
+  improvement, it appends a suggestion to `## Proposed Workflow Improvements`
+  in `roadmap/CURRENT-STATE.md`. Humans review those suggestions and record
+  applied improvements here.
+-->

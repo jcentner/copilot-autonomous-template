@@ -14,10 +14,11 @@ Phase plans are stored in [phases/](phases/).
 
 ## How Phases Work
 
-1. **Plan** — `/phase-plan` creates a planning doc with features, dependencies, and acceptance criteria
-2. **Detail** — `/implementation-plan` creates a file-by-file checklist
-3. **Implement** — `/implement` executes the plan with tests
-4. **Review** — `/code-review` reviews code quality, architecture, and security
-5. **Complete** — `/phase-complete` updates docs, records lessons, marks done
+1. **Design** — `/design-plan` produces user stories, acceptance criteria, non-goals, risks, ADR candidates, test strategy, and a slice breakdown (planner → critic critique → design approval)
+2. **Plan** — `/implementation-plan` produces a file-by-file slice plan (planner → critic critique)
+3. **Implement** — `/implement` executes the slice loop (tester + reviewer per slice)
+4. **Code Review** — `/code-review` per slice; verdict recorded in CURRENT-STATE
+5. **Strategic Review** — `/strategic-review` validates shipped phase against design intent (product-owner)
+6. **Complete** — `/phase-complete` runs the cleanup checklist, writes the wrap summary, advances the state machine
 
-The autonomous builder agent performs this cycle automatically with enforced review gates. The prompts are available as manual overrides for human-driven sessions.
+The autonomous builder agent performs this cycle automatically with hook-enforced gates. The prompts are available as manual overrides for human-driven sessions.
