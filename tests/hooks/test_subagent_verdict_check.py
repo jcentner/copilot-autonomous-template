@@ -7,7 +7,7 @@ import tempfile
 import textwrap
 import unittest
 
-from _helpers import HOOK_DIR, make_state
+from _helpers import HOOK_DIR, make_state, make_phase_artifact
 
 
 def run_verdict_hook(subagent, payload, cwd):
@@ -46,11 +46,38 @@ class CriticVerdictTests(unittest.TestCase):
 
     def test_design_critique_approved_allows(self):
         make_state(self.tmp, stage="design-critique", design_status="approved")
+        make_phase_artifact(self.tmp, "phase-1-critique-design-R1.md")
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertFalse(is_block(out))
 
     def test_design_critique_revise_allows(self):
         make_state(self.tmp, stage="design-critique", design_status="revise")
+        make_phase_artifact(self.tmp, "phase-1-critique-design-R1.md")
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertFalse(is_block(out))
+
+    def test_design_critique_missing_artifact_blocks(self):
+        # Terminal status set but critic didn't write the round file.
+        make_state(self.tmp, stage="design-critique", design_status="approved")
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_implementation_critique_missing_artifact_blocks(self):
+        make_state(
+            self.tmp,
+            stage="implementation-critique",
+            implementation_status="approved",
+        )
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_implementation_critique_with_artifact_allows(self):
+        make_state(
+            self.tmp,
+            stage="implementation-critique",
+            implementation_status="approved",
+        )
+        make_phase_artifact(self.tmp, "phase-1-critique-implementation-R1.md")
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertFalse(is_block(out))
 
@@ -187,6 +214,7 @@ class ReviewerVerdictTests(unittest.TestCase):
             critical=0,
             major=1,
         )
+        make_phase_artifact(self.tmp, "phase-1-review-slice-1.md")
         rc, out, _ = run_verdict_hook("reviewer", {"cwd": str(self.tmp)}, self.tmp)
         self.assertFalse(is_block(out))
 
@@ -198,8 +226,160 @@ class ReviewerVerdictTests(unittest.TestCase):
             critical=0,
             major=2,
         )
+        make_phase_artifact(self.tmp, "phase-1-review-slice-1.md")
         rc, out, _ = run_verdict_hook("reviewer", {"cwd": str(self.tmp)}, self.tmp)
         self.assertFalse(is_block(out))
+
+    def test_missing_review_artifact_blocks(self):
+        make_state(
+            self.tmp,
+            reviewer_invoked="yes",
+            review_verdict="pass",
+            critical=0,
+            major=0,
+        )
+        # No phase-1-review-slice-1.md on disk.
+        rc, out, _ = run_verdict_hook("reviewer", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_na_verdict_skips_artifact_check(self):
+        make_state(
+            self.tmp,
+            reviewer_invoked="yes",
+            review_verdict="n/a",
+            critical=0,
+            major=0,
+        )
+        rc, out, _ = run_verdict_hook("reviewer", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertFalse(is_block(out))
+
+
+class PlannerVerdictTests(unittest.TestCase):
+    """Planner SubagentStop: verify the plan file the planner claims to have
+    written actually exists and is non-empty."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = pathlib.Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_planning_missing_plan_file_blocks(self):
+        make_state(self.tmp, stage="planning", design_status="draft")
+        rc, out, _ = run_verdict_hook("planner", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_planning_with_plan_file_allows(self):
+        make_state(self.tmp, stage="planning", design_status="draft")
+        make_phase_artifact(self.tmp, "phase-1-design.md", body="# design\n")
+        rc, out, _ = run_verdict_hook("planner", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertFalse(is_block(out))
+
+    def test_planning_empty_plan_file_blocks(self):
+        make_state(self.tmp, stage="planning", design_status="draft")
+        make_phase_artifact(self.tmp, "phase-1-design.md", body="")
+        rc, out, _ = run_verdict_hook("planner", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_implementation_planning_missing_plan_blocks(self):
+        make_state(
+            self.tmp,
+            stage="implementation-planning",
+            implementation_status="draft",
+        )
+        rc, out, _ = run_verdict_hook("planner", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_implementation_planning_with_plan_allows(self):
+        make_state(
+            self.tmp,
+            stage="implementation-planning",
+            implementation_status="draft",
+        )
+        make_phase_artifact(self.tmp, "phase-1-implementation.md", body="# impl\n")
+        rc, out, _ = run_verdict_hook("planner", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertFalse(is_block(out))
+
+    def test_reviewing_fallback_pending_blocks(self):
+        make_state(self.tmp, stage="reviewing", strategic_review="pending")
+        rc, out, _ = run_verdict_hook("planner", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_reviewing_fallback_pass_allows(self):
+        make_state(self.tmp, stage="reviewing", strategic_review="pass")
+        rc, out, _ = run_verdict_hook("planner", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertFalse(is_block(out))
+
+
+class PhaseCoercionTests(unittest.TestCase):
+    """Phase field must be a bare integer; non-numeric values are corruption."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = pathlib.Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _corrupt_phase(self, bad_value):
+        state_path = self.tmp / "roadmap" / "state.md"
+        state_path.write_text(
+            state_path.read_text().replace("**Phase**: 1", f"**Phase**: {bad_value}")
+        )
+
+    def test_non_numeric_phase_blocks_critic(self):
+        make_state(self.tmp, stage="design-critique", design_status="approved")
+        self._corrupt_phase("Phase 1")
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+        self.assertIn("Phase", out["hookSpecificOutput"]["reason"])
+
+    def test_float_phase_blocks_critic(self):
+        make_state(self.tmp, stage="design-critique", design_status="approved")
+        self._corrupt_phase("1.0")
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_empty_phase_blocks_critic(self):
+        make_state(self.tmp, stage="design-critique", design_status="approved")
+        self._corrupt_phase("")
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_non_numeric_phase_blocks_reviewer(self):
+        make_state(
+            self.tmp,
+            reviewer_invoked="yes",
+            review_verdict="pass",
+            critical=0,
+            major=0,
+        )
+        self._corrupt_phase("two")
+        rc, out, _ = run_verdict_hook("reviewer", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    # CR-5: Phase=0 is reserved for bootstrap; critique stages require >= 1.
+
+    def test_phase_zero_blocks_critic_in_design_critique(self):
+        make_state(self.tmp, stage="design-critique", design_status="approved")
+        self._corrupt_phase("0")
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+        self.assertIn("Phase", out["hookSpecificOutput"]["reason"])
+
+    def test_phase_zero_blocks_reviewer_in_executing(self):
+        make_state(
+            self.tmp,
+            stage="executing",
+            reviewer_invoked="yes",
+            review_verdict="pass",
+            critical=0,
+            major=0,
+        )
+        self._corrupt_phase("0")
+        rc, out, _ = run_verdict_hook("reviewer", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
 
 
 class UnknownSubagentTests(unittest.TestCase):
@@ -212,7 +392,7 @@ class UnknownSubagentTests(unittest.TestCase):
 
     def test_unknown_subagent_allows(self):
         make_state(self.tmp)
-        rc, out, _ = run_verdict_hook("planner", {"cwd": str(self.tmp)}, self.tmp)
+        rc, out, _ = run_verdict_hook("mystery-agent", {"cwd": str(self.tmp)}, self.tmp)
         self.assertFalse(is_block(out))
 
     def test_missing_state_file_allows(self):

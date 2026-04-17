@@ -11,7 +11,7 @@ HOOK_DIR = REPO_ROOT / "template" / ".github" / "hooks" / "scripts"
 
 
 def run_hook(hook_name, stdin_payload, cwd=None):
-    """Pipe JSON `stdin_payload` into the named hook and return (returncode, parsed_stdout, stderr)."""
+    """Pipe JSON stdin into the named hook and return (returncode, parsed_stdout, stderr)."""
     hook_path = HOOK_DIR / hook_name
     assert hook_path.exists(), f"missing hook: {hook_path}"
     result = subprocess.run(
@@ -30,6 +30,7 @@ def run_hook(hook_name, stdin_payload, cwd=None):
 def make_state(
     tmp_path,
     stage="executing",
+    blocked_kind="n/a",
     design_status="approved",
     implementation_status="approved",
     tests_written="yes",
@@ -40,19 +41,25 @@ def make_state(
     major=0,
     strategic_review="n/a",
     committed="yes",
+    active_slice=1,
+    evidence_for_slice=None,
     checklist_checked=True,
+    write_narrative=True,
 ):
-    """Create a CURRENT-STATE.md under tmp_path/roadmap/ and return workspace root."""
+    """Create roadmap/state.md (machine fields) under tmp_path; return workspace root."""
     roadmap = tmp_path / "roadmap"
     roadmap.mkdir(parents=True, exist_ok=True)
     check = "x" if checklist_checked else " "
-    content = textwrap.dedent(
+    if evidence_for_slice is None:
+        evidence_for_slice = active_slice
+    state = textwrap.dedent(
         f"""\
-        # Test — Current State
+        # Test — Workflow State
 
         ## Workflow State
 
         - **Stage**: {stage}
+        - **Blocked Kind**: {blocked_kind}
         - **Phase**: 1
         - **Phase Title**: Test
         - **Source Root**: src/
@@ -62,12 +69,13 @@ def make_state(
         - **Implementation Plan**: roadmap/phases/phase-1-implementation.md
         - **Implementation Status**: {implementation_status}
         - **Implementation Critique Rounds**: 1
-        - **Active Slice**: 1
+        - **Active Slice**: {active_slice}
         - **Slice Total**: 3
         - **Blocked Reason**: n/a
 
         ## Slice Evidence
 
+        - **Evidence For Slice**: {evidence_for_slice}
         - **Tests Written**: {tests_written}
         - **Tests Pass**: {tests_pass}
         - **Reviewer Invoked**: {reviewer_invoked}
@@ -87,17 +95,36 @@ def make_state(
         - [{check}] Wrap summary written
         - [{check}] Context notes saved to /memories/repo/
         - [{check}] CURRENT-STATE updated for next phase
-
-        ## Waivers
-
-        ## Proposed Workflow Improvements
-
-        ## Session Log
-
-        ## Context
-
-        Test fixture.
         """
     )
-    (roadmap / "CURRENT-STATE.md").write_text(content)
+    (roadmap / "state.md").write_text(state)
+
+    if write_narrative:
+        narrative = textwrap.dedent(
+            """\
+            # Test — Narrative State
+
+            ## Active Session
+
+            - **Log**: _(populated by evidence-tracker)_
+
+            ## Waivers
+
+            ## Proposed Workflow Improvements
+
+            ## Context
+
+            Test fixture.
+            """
+        )
+        (roadmap / "CURRENT-STATE.md").write_text(narrative)
+
     return tmp_path
+
+
+def make_phase_artifact(tmp_path, filename, body="# stub\n"):
+    """Create a file under tmp_path/roadmap/phases/."""
+    phases = tmp_path / "roadmap" / "phases"
+    phases.mkdir(parents=True, exist_ok=True)
+    (phases / filename).write_text(body)
+    return phases / filename

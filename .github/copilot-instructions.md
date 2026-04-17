@@ -16,20 +16,33 @@ template/                           # Everything under here gets copied to the t
     instructions/
       docs.instructions.md          # File-based instructions for *.md (no Jinja — copied as-is)
     agents/
-      autonomous-builder.agent.md.jinja   # Main autonomous build loop agent (with Stop hook)
+      autonomous-builder.agent.md.jinja   # Stage orchestrator (with Stop hook)
       planner.agent.md.jinja              # Read-only research/planning subagent
-      reviewer.agent.md.jinja             # Code review + security subagent with handoff
-      tester.agent.md.jinja               # Test-from-spec subagent (hidden from picker)
+      critic.agent.md.jinja               # Adversarial design/implementation review
+      product-owner.agent.md.jinja        # User stories + strategic review
+      reviewer.agent.md.jinja             # Per-slice code review + security
+      tester.agent.md.jinja               # Test-from-spec subagent (isolation-enforced)
     hooks/
       scripts/
-        slice-gate.py               # Stop hook: enforces review + prevents premature stopping
+        _state_io.py                # Shared atomic read/write for state.md
+        stage-gate.py               # PreToolUse: edits gated by Stage
+        session-gate.py             # Stop hook: blocks premature stop, parses state.md
+        tool-guardrails.py          # PreToolUse: destructive-command + protected-path denylist
+        subagent-verdict-check.py   # SubagentStop: verifies critic/po/reviewer/planner wrote state
+        tester-isolation.py         # PreToolUse (tester): blocks reads of source code
+        evidence-tracker.py         # PostToolUse: per-session activity log
+        context-pressure.py         # PostToolUse: context-window advisory
+        write-test-evidence.py      # Agent helper: stamps Tests Pass + Evidence For Slice
     prompts/
       PROMPT-GUIDE.md.jinja         # Human-facing usage guide
-      phase-plan.prompt.md.jinja    # Plan a new development phase
-      implementation-plan.prompt.md.jinja  # File-by-file implementation checklist
-      implement.prompt.md.jinja     # Execute an implementation plan
-      code-review.prompt.md.jinja   # Code review + security audit
-      phase-complete.prompt.md.jinja      # Complete a phase, update docs
+      design-plan.prompt.md.jinja
+      implementation-plan.prompt.md.jinja
+      implement.prompt.md.jinja
+      code-review.prompt.md.jinja
+      strategic-review.prompt.md.jinja
+      phase-complete.prompt.md.jinja
+      vision-expand.prompt.md.jinja
+      resume.prompt.md.jinja        # Unblock routing on Blocked Kind
     skills/
       README.md                     # Stack skills convention (verbatim)
     catalog/                        # Dormant workflow capabilities (the storehouse)
@@ -45,7 +58,12 @@ template/                           # Everything under here gets copied to the t
       VISION-LOCK.md.jinja          # Versioned vision lock (goals, outcomes, constraints)
       archive/                      # Archived vision versions
   roadmap/                          # Roadmap structure with checkpoint protocol
+    state.md.jinja                  # Machine-readable workflow state (Stage, Phase, Slice Evidence, etc.)
+    CURRENT-STATE.md.jinja          # Narrative state (Context, Proposed Improvements, Active Session link)
+    sessions/                       # Per-session activity logs (one file per Copilot session)
 ```
+
+Unit tests live under `tests/hooks/` (160 tests, stdlib `unittest`). End-to-end smoke test in `tests/smoke.sh`. Run with `make test-all`.
 
 ## How Copier Templating Works
 
@@ -74,7 +92,14 @@ template/                           # Everything under here gets copied to the t
 
 ## Validating Changes
 
-There is no build step or test suite. To validate:
+Unit tests + smoke test:
+
+```bash
+make test-all          # Runs hook unit tests then smoke.sh
+make test-hooks        # Just unit tests (fast, no copier copy)
+```
+
+Manual generation for inspection:
 
 ```bash
 # Generate into a temp directory and inspect output

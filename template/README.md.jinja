@@ -11,11 +11,10 @@ This project uses an AI-assisted autonomous development workflow powered by GitH
 1. Open this repo in VS Code
 2. Ensure GitHub Copilot is active
 3. Enable recommended settings:
-   - `chat.useCustomAgentHooks`: `true` (enables Stop hook for slice discipline)
+   - `chat.useCustomAgentHooks`: `true` (enables Stop, PreToolUse, PostToolUse, SubagentStop hooks — required for the workflow state machine)
    - `chat.autopilot.enabled`: `true` (for fully autonomous sessions)
-   - `chat.agent.sandbox`: `true` (restricts writes to workspace)
 4. Open Chat (Ctrl+Shift+I) and select the **autonomous-builder** agent
-5. The agent will read `roadmap/CURRENT-STATE.md` and continue from where it left off
+5. The agent will read `roadmap/state.md` and continue from where it left off
 
 ### Copilot CLI (Background Sessions)
 

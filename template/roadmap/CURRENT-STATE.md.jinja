@@ -1,63 +1,14 @@
-# {{ project_name }} — Current State
+# {{ project_name }} — Narrative State
 
-<!--
-  This file is machine-readable. Hooks parse the fields below to enforce the stage pipeline.
-  Use the exact vocabulary — do not paraphrase values.
+> **Machine-readable workflow state lives in [state.md](state.md).** Hooks
+> parse that file. This file holds narrative context that humans read and
+> agents append to.
+>
+> **Per-session activity logs live in [sessions/](sessions/).**
 
-  Stage vocabulary (one of):
-    bootstrap | planning | design-critique | implementation-planning |
-    implementation-critique | executing | reviewing | cleanup | blocked | complete
+## Active Session
 
-  Status vocabulary (Design Status, Implementation Status):
-    n/a | draft | in-critique | approved | revise | rethink | waived
-
-  Slice Evidence value vocabulary:
-    yes | no | pending | n/a
-
-  Review Verdict vocabulary:
-    pending | pass | needs-fixes | needs-rework | n/a
-
-  Strategic Review vocabulary:
-    pending | pass | replan | n/a
--->
-
-## Workflow State
-
-- **Stage**: bootstrap
-- **Phase**: 0
-- **Phase Title**: Bootstrap
-- **Source Root**: src/
-- **Design Plan**: n/a
-- **Design Status**: n/a
-- **Design Critique Rounds**: 0
-- **Implementation Plan**: n/a
-- **Implementation Status**: n/a
-- **Implementation Critique Rounds**: 0
-- **Active Slice**: n/a
-- **Slice Total**: n/a
-- **Blocked Reason**: n/a
-
-## Slice Evidence
-
-- **Tests Written**: n/a
-- **Tests Pass**: n/a
-- **Reviewer Invoked**: n/a
-- **Review Verdict**: n/a
-- **Critical Findings**: 0
-- **Major Findings**: 0
-- **Strategic Review**: n/a
-- **Committed**: n/a
-
-## Phase Completion Checklist
-
-- [ ] All acceptance criteria verified
-- [ ] ADRs recorded for new decisions
-- [ ] Open questions resolved or flagged
-- [ ] Tech debt documented
-- [ ] Docs synced (README, architecture, instructions)
-- [ ] Wrap summary written
-- [ ] Context notes saved to /memories/repo/
-- [ ] CURRENT-STATE updated for next phase
+- **Log**: _(populated by `evidence-tracker.py` on first tool call)_
 
 ## Waivers
 
@@ -65,12 +16,16 @@
 
 ## Proposed Workflow Improvements
 
-(Builder writes improvement suggestions here. Humans review and apply manually — the builder does not self-modify.)
-
-## Session Log
-
-<!-- Hooks and agents append `- [ISO8601 timestamp] <event>` lines here. -->
+(Builder writes improvement suggestions here. Humans review and apply manually
+between phases — the builder does not self-modify hooks, agents, or prompts.)
 
 ## Context
 
-Bootstrap mode. `BOOTSTRAP.md` in the project root walks through greenfield vs existing detection, vision lock creation, and phase 1 design plan setup. After bootstrap completes, it deletes itself and this file is updated with Phase 1 details.
+Bootstrap mode. `BOOTSTRAP.md` in the project root walks through greenfield vs
+existing detection, vision lock creation, and phase 1 design plan setup. After
+bootstrap completes, it deletes itself and this file is updated with Phase 1
+context.
+
+The builder appends a short narrative summary here at significant transitions
+(stage advances, phase completion, blocked reasons). Per-tool-call logging
+goes to `sessions/<id>.md` automatically.

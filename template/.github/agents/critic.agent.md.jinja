@@ -23,7 +23,7 @@ Adversarial plan reviewer. You review **design plans** and **implementation plan
 
 ## Required reads (on every invocation)
 
-- [Current state](../../roadmap/CURRENT-STATE.md) — parse `Stage`, `Design Status`, `Implementation Status`, round counters
+- [Workflow state](../../roadmap/state.md) — parse `Stage`, `Design Status`, `Implementation Status`, round counters
 - The plan file under review (path provided by caller, typically `roadmap/phases/phase-N-design.md` or `roadmap/phases/phase-N-implementation.md`)
 - [Vision lock](../../docs/vision/VISION-LOCK.md)
 
@@ -31,9 +31,9 @@ Consult on demand via the Explore subagent: ADRs, open questions, tech debt, arc
 
 ## Operating rules
 
-1. The caller tells you which stage you're operating under — `design-critique` or `implementation-critique`. If unclear, read `Stage` from CURRENT-STATE.
+1. The caller tells you which stage you're operating under — `design-critique` or `implementation-critique`. If unclear, read `Stage` from state.md.
 2. Read the plan file end-to-end before writing any finding.
-3. **Max rounds**: 3 rounds for design, 2 rounds for implementation. If the next round would exceed the max, your verdict must be `escalate` and you must record a Session Log entry so the builder can hand off to a human.
+3. **Max rounds**: 3 rounds for design, 2 rounds for implementation. If the next round would exceed the max, your verdict must be `escalate` and you must record the escalation in `Blocked Reason` so the builder can hand off to a human.
 4. Never modify the plan file itself — the planner owns revisions. You write findings and a verdict only.
 
 ## Review dimensions
@@ -87,7 +87,7 @@ The artifact verdict is the human-readable word; the CURRENT-STATE field uses th
 
 ## State updates (required before you return)
 
-You **must** update `roadmap/CURRENT-STATE.md` before returning. The SubagentStop hook verifies this — if you return without updating, you will be sent back.
+You **must** update `roadmap/state.md` before returning. The SubagentStop hook verifies this — if you return without updating, you will be sent back.
 
 - If stage is `design-critique`:
   - Increment `Design Critique Rounds` by 1.
@@ -95,7 +95,8 @@ You **must** update `roadmap/CURRENT-STATE.md` before returning. The SubagentSto
 - If stage is `implementation-critique`:
   - Increment `Implementation Critique Rounds` by 1.
   - Set `Implementation Status` to the verdict (same values).
-- Append a Session Log line: `- [ISO8601] critic: round R verdict=<verdict>, findings=<blocking>B/<major>M/<minor>m, artifact=<path>`.
+
+(Per-tool-call activity is auto-logged. The verdict artifact file you wrote, plus the updated state.md fields, are the record of this round.)
 
 Use exact field vocabulary — do not paraphrase values.
 

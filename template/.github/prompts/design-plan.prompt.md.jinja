@@ -9,7 +9,7 @@ You are drafting the design plan for the next phase of {{ project_name }}. The a
 
 ## Required reads
 
-- [Current state](../../roadmap/CURRENT-STATE.md) — parse `Phase`, `Stage`, open slice evidence
+- [Workflow state](../../roadmap/state.md) — parse `Phase`, `Stage`, open slice evidence
 - [Vision lock](../../docs/vision/VISION-LOCK.md) — authoritative scope
 - [Roadmap](../../roadmap/README.md)
 - [Open questions](../../docs/reference/open-questions.md) — flag blockers
@@ -70,11 +70,10 @@ Ordered, independently-shippable slices with file-level hints.
 
 ## After writing
 
-Update `roadmap/CURRENT-STATE.md`:
+Update `roadmap/state.md`:
 
 - Set **Design Plan** to the file path (`roadmap/phases/phase-N-design.md`).
 - Set **Design Status** to `draft`.
-- Append to Session Log: `- [ISO8601] design-plan: draft written to <path>`.
 
 ## Handoff
 
@@ -87,5 +86,5 @@ When the draft is complete, hand off to:
 
 - Do **not** make implementation decisions here — that's `/implementation-plan`.
 - Flag unresolved blockers in `docs/reference/open-questions.md`; do not paper over them.
-- Do not edit source code. Your scope is plan files + CURRENT-STATE.
+- Do not edit source code. Your scope is plan files + `state.md`.
 - Respect authority order: VISION-LOCK > ADRs > architecture > roadmap. If this phase would contradict a higher doc, raise it instead of silently working around it.

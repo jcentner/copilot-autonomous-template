@@ -2,21 +2,21 @@
 
 A [copier](https://copier.readthedocs.io/) template for bootstrapping an autonomous AI development workflow using GitHub Copilot.
 
-> **v2 (April 2026)** — major restructure around a hook-verified stage machine. See [`tmp/v2-proposal.md`](tmp/v2-proposal.md) and phase plans `tmp/phase-{a,b,c,d}-plan.md` for the design. The workflow now runs as `bootstrap → planning → design-critique → implementation-planning → implementation-critique → executing → reviewing → cleanup`, with SubagentStop hooks verifying that critic/product-owner/reviewer write their verdicts to `CURRENT-STATE.md` before returning.
+> **v1.0.0 (April 2026)** — first tagged release. The workflow is a hook-verified stage machine: `bootstrap → planning → design-critique → implementation-planning → implementation-critique → executing → reviewing → cleanup`. Workflow state lives in `state.md` (machine), narrative in `CURRENT-STATE.md`, and per-tool activity in `roadmap/sessions/<session>.md`. See [CHANGELOG.md](CHANGELOG.md) and [docs/architecture/decisions/](docs/architecture/decisions/) (ADRs 001–010) for the design rationale.
 
 ## What you get
 
 This template creates a complete `.github/` setup for autonomous development:
 
-- **Autonomous builder agent** — stage orchestrator that dispatches subagents based on `Stage` in `CURRENT-STATE.md`.
+- **Autonomous builder agent** — stage orchestrator that dispatches subagents based on `Stage` in `roadmap/state.md`.
 - **6 core subagents** — `planner`, `critic`, `product-owner`, `reviewer`, `tester`, plus `Explore` for read-only research.
 - **Hook-enforced state machine** — `stage-gate` (edits gated by stage), `session-gate` (Stop backstop for terminal bypass), `tool-guardrails` (destructive-command denylist), `subagent-verdict-check` (SubagentStop state verification), `tester-isolation` (tester can't read implementation), `evidence-tracker`, `context-pressure`.
-- **7 manual-override prompts** — `/design-plan`, `/implementation-plan`, `/implement`, `/code-review`, `/strategic-review`, `/phase-complete`, `/vision-expand`.
+- **8 manual-override prompts** — `/design-plan`, `/implementation-plan`, `/implement`, `/code-review`, `/strategic-review`, `/phase-complete`, `/vision-expand`, `/resume`.
 - **Workflow catalog** — dormant capabilities activated by the human at bootstrap (2 agents, 4 skills, 1 hook, 2 prompts, 2 patterns).
 - **`AGENTS.md`** — cross-agent instructions recognized by Copilot, Claude Code, and other AI agents.
 - **Documentation skeleton** — vision lock (versioned living document), ADRs, open questions, tech debt, glossary, phase wraps.
 - **Roadmap structure** — checkpoint-based cross-session continuity with machine-readable fields hooks can parse.
-- **Test suite** — 91 unit tests for hooks + smoke test for generated output.
+- **Test suite** — 160 unit tests for hooks + smoke test for generated output (`make test-all`).
 
 ## Usage
 
@@ -75,7 +75,7 @@ The autonomous builder agent runs a continuous loop:
 7. **Commit** — atomic commit with conventional message
 8. **Checkpoint** — updates durable state for the next session or slice
 
-A **Stop hook** (`slice-gate.py`) enforces discipline: the agent cannot stop until the phase is marked complete or explicitly blocked. This prevents premature stopping and skipped reviews.
+A **Stop hook** (`session-gate.py`) enforces discipline: it parses `roadmap/state.md` and blocks stop unless the current stage's gating fields are satisfied (e.g., during `executing`: tests pass, reviewer invoked, no Critical/Major findings, committed). A `subagent-verdict-check.py` SubagentStop hook does the same for critic/product-owner/reviewer/planner returns. This prevents premature stopping and skipped reviews.
 
 **Skills workflow**: During bootstrap (and whenever a new technology is adopted), the builder creates Agent Skills in `.github/skills/` that ground all agents in official documentation for each technology in the stack. These are auto-discovered by Copilot when relevant.
 
@@ -85,7 +85,7 @@ A **Stop hook** (`slice-gate.py`) enforces discipline: the agent cannot stop unt
 
 Each session is stateless — all cross-session continuity comes from files in the repo and repository memory.
 
-The manual prompts (`/phase-plan` → `/implement` → `/code-review` → `/phase-complete`) remain available as override tools for human-driven sessions.
+The manual prompts (`/design-plan` → `/implementation-plan` → `/implement` → `/code-review` → `/strategic-review` → `/phase-complete`) remain available as override tools for human-driven sessions. Use `/resume` to unblock a session waiting on design approval, vision update, or a human decision.
 
 ### Copilot CLI Support
 

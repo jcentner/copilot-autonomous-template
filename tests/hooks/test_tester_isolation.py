@@ -144,6 +144,45 @@ class GrepAndFileSearchTests(unittest.TestCase):
     def test_file_search_source_pattern_denied(self):
         self.assertEqual(self._fsearch("src/**"), "deny")
 
+    # --- Bug D regression: collocated tests under Source Root. ---
+
+    def test_grep_collocated_tests_dir_allowed(self):
+        # Monorepo style: tests live under src/tests/.
+        self.assertEqual(self._grep(include="src/tests/**"), "allow")
+
+    def test_grep_collocated_dunder_tests_allowed(self):
+        # JS-style colocation: src/foo/__tests__/.
+        self.assertEqual(self._grep(include="src/foo/__tests__/**"), "allow")
+
+    def test_grep_collocated_test_suffix_allowed(self):
+        # TS/JS style: src/**/*.test.ts.
+        self.assertEqual(self._grep(include="src/**/*.test.*"), "allow")
+
+    def test_grep_collocated_spec_suffix_allowed(self):
+        self.assertEqual(self._grep(include="src/**/*.spec.*"), "allow")
+
+    def test_grep_source_unscoped_still_denied(self):
+        # src/**/*.py is not a test pattern \u2014 must remain denied.
+        self.assertEqual(self._grep(include="src/**/*.py"), "deny")
+
+    # --- Substring-boundary regressions: directory names that merely
+    # contain a test keyword must not be treated as test locations. ---
+
+    def test_grep_pretests_dir_denied(self):
+        # `src/pretests/**` contains `tests/**` as a raw substring but is
+        # NOT a test directory. Must be denied.
+        self.assertEqual(self._grep(include="src/pretests/**"), "deny")
+
+    def test_grep_latest_dir_denied(self):
+        # `src/latest/**` contains `test/**` as a raw substring. Denied.
+        self.assertEqual(self._grep(include="src/latest/**"), "deny")
+
+    def test_grep_contest_data_dir_denied(self):
+        self.assertEqual(self._grep(include="src/contest_data/**"), "deny")
+
+    def test_file_search_pretests_denied(self):
+        self.assertEqual(self._fsearch("src/pretests/**"), "deny")
+
 
 class OtherToolsTests(unittest.TestCase):
     def setUp(self):
@@ -192,7 +231,7 @@ class CustomSourceRootTests(unittest.TestCase):
 
     def test_custom_source_root_applied(self):
         make_state(self.tmp)
-        state_file = self.tmp / "roadmap" / "CURRENT-STATE.md"
+        state_file = self.tmp / "roadmap" / "state.md"
         state_file.write_text(
             state_file.read_text().replace("Source Root**: src/", "Source Root**: app/")
         )

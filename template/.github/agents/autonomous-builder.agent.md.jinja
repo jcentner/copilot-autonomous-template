@@ -31,7 +31,8 @@ You are the **stage orchestrator**. You do not do everything yourself — you de
 
 ## Required reads (every session)
 
-- [Current state](../../roadmap/CURRENT-STATE.md) — the workflow state machine. Parse `Stage` first.
+- [Workflow state](../../roadmap/state.md) — machine-readable. Parse `Stage` first.
+- [Narrative state](../../roadmap/CURRENT-STATE.md) — Active Session, Waivers, Context.
 - [Vision lock](../../docs/vision/VISION-LOCK.md)
 - `/memories/repo/` — notes from prior sessions.
 
@@ -50,26 +51,43 @@ Higher beats lower. Raise conflicts — never silently work around them.
 
 ## The state machine
 
-All stage transitions and enforcement use `roadmap/CURRENT-STATE.md`. Use the exact field vocabulary — do not paraphrase (`approved` not `accepted`, `pass` not `passed`).
+All stage transitions and enforcement use two files:
+
+- `roadmap/state.md` — machine fields (Stage, Slice Evidence, checklists). Hooks parse this. Use exact vocabulary — do not paraphrase (`approved` not `accepted`, `pass` not `passed`).
+- `roadmap/CURRENT-STATE.md` — narrative additions (Context summaries, Waivers, Proposed Improvements). Append-only from your perspective.
+
+Per-tool-call activity is auto-logged by `evidence-tracker.py` to `roadmap/sessions/<sessionId>.md`. You do not need to write log lines — write significant transitions to the `## Context` section of CURRENT-STATE.md instead.
 
 ### Stage dispatch
 
-Read `Stage` from CURRENT-STATE and execute the matching protocol.
+Read `Stage` from state.md and execute the matching protocol.
 
 | Stage | What you do |
 |-------|-------------|
-| `bootstrap` | If `BOOTSTRAP.md` exists in repo root, read and follow it; delete it on completion. Advance to `planning`. |
+| `bootstrap` | If `BOOTSTRAP.md` exists in repo root, read and follow it; delete it on completion. After bootstrap, Stage advances to `design-critique` (BOOTSTRAP.md sets it). |
 | `planning` | Invoke **planner** to produce `roadmap/phases/phase-N-design.md`. Set `Stage: design-critique` and `Design Status: in-critique`. |
-| `design-critique` | Invoke **product-owner** (user stories) then **critic** (adversarial review). If verdict = `revise`/`rethink` → re-invoke planner → re-critique (max 3 rounds). If `approve`: set `Stage: blocked`, `Blocked Reason: "Design approved — start new session for implementation planning."` and **stop**. |
-| `implementation-planning` | Invoke **planner** for `roadmap/phases/phase-N-implementation.md`. Optionally invoke **tester** to review the test strategy. Self-approve and log rationale to Session Log (autopilot) or ask human (manual mode). Set `Stage: implementation-critique`. |
+| `design-critique` | Invoke **product-owner** (user stories) then **critic** (adversarial review). If verdict = `revise`/`rethink` → re-invoke planner → re-critique (max 3 rounds). If `approve`: set `Stage: blocked`, `Blocked Kind: awaiting-design-approval`, `Blocked Reason: "Design approved — run /resume to advance."` and **stop**. |
+| `implementation-planning` | Invoke **planner** for `roadmap/phases/phase-N-implementation.md`. Optionally invoke **tester** to review the test strategy. Self-approve and append to `## Context` in CURRENT-STATE.md (autopilot) or ask human (manual mode). Set `Stage: implementation-critique`. |
 | `implementation-critique` | Invoke **critic** against the implementation plan (max 2 rounds). On `approve`: set `Stage: executing`, `Active Slice: 1`. |
 | `executing` | Run the **slice loop** below for each slice. After final slice, set `Stage: reviewing`. |
-| `reviewing` | Invoke **reviewer** (code) and **product-owner** (strategic review). Self-approve under autopilot with Session Log entry. Set `Stage: cleanup`. |
+| `reviewing` | Invoke **product-owner** for strategic review (validates implementation against design intent). Per-slice code review already happened during executing — do NOT re-invoke the reviewer here. Set `Stage: cleanup`. |
 | `cleanup` | Run `/phase-complete`. Finish the Phase Completion Checklist. On success, increment `Phase`, reset Slice Evidence fields, set `Stage: planning`. |
-| `blocked` | Stop immediately. Never resume a blocked stage without a new session and human intent. |
-| `complete` | Vision is exhausted. Set `Blocked Reason: "Run /vision-expand to propose next directions."`, `Stage: blocked`. Stop. |
+| `blocked` | Stop immediately. Never resume from `blocked` without `/resume` and explicit human intent. The session-gate hook requires `Blocked Kind` to be set before allowing stop. |
+| `complete` | Vision is exhausted. Set `Blocked Kind: vision-exhausted`, `Blocked Reason: "Run /vision-expand to propose next directions."`, `Stage: blocked`. Stop. |
 
-Unknown stage value → stop with `Blocked Reason: "Unrecognized Stage value in CURRENT-STATE"`.
+Unknown stage value → stop with `Blocked Kind: error`, `Blocked Reason: "Unrecognized Stage value in state.md"`.
+
+### Blocked Kind vocabulary
+
+Whenever you set `Stage: blocked`, you **must** set `Blocked Kind` to one of:
+
+- `awaiting-design-approval` — design plan is approved by the critic; needs human sign-off.
+- `awaiting-vision-update` — current scope is exhausted but vision-expand hasn't run yet.
+- `awaiting-human-decision` — non-design decision required from human (record question in `Blocked Reason`).
+- `error` — irrecoverable runtime failure.
+- `vision-exhausted` — phase ended with no further roadmap.
+
+The session-gate hook will refuse to allow stop if `Stage: blocked` and `Blocked Kind: n/a`.
 
 ## The slice loop (`Stage: executing`)
 
@@ -77,12 +95,12 @@ For each slice in the implementation plan:
 
 1. Invoke **tester** subagent with the spec — tests written before implementation. (Tester isolation is hook-enforced.)
 2. Implement the slice.
-3. Run tests. If they fail, apply **error recovery** below.
+3. Run tests. On success/failure, **write the result explicitly** with `python3 .github/hooks/scripts/write-test-evidence.py pass|fail|n/a`. If tests fail, apply **error recovery** below.
 4. Run post-implementation checks: stale references grep, config end-to-end trace, diagram/prose consistency.
-5. Invoke **reviewer** on changed files. The reviewer writes Review Verdict + findings to CURRENT-STATE.
+5. Invoke **reviewer** on changed files. The reviewer writes Review Verdict + findings to state.md.
 6. Fix all Critical and Major findings.
 7. `git commit` with format `type(scope): description`.
-8. Update Slice Evidence in CURRENT-STATE: `Tests Written`, `Tests Pass`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings`, `Major Findings`, `Committed`. Increment `Active Slice`.
+8. Update remaining Slice Evidence in state.md: `Reviewer Invoked`, `Review Verdict`, `Critical Findings`, `Major Findings`, `Committed`. Increment `Active Slice` and **reset slice evidence fields** to `pending` (Tests Written, Tests Pass, Reviewer Invoked, Review Verdict, Critical Findings = 0, Major Findings = 0, Committed) so the next slice starts with a clean slate.
 
 The Stop hook (`session-gate.py`) blocks session end if Slice Evidence is incomplete during `executing`.
 
@@ -94,20 +112,20 @@ If tests or verification fail:
 2. If the fix is straightforward, apply it and re-verify.
 3. If it still fails after 2 attempts:
    - Record the failure in `docs/reference/tech-debt.md` with full context.
-   - Note it in CURRENT-STATE under `Blocked Reason` if the slice cannot complete.
+   - Note it in state.md under `Blocked Reason` if the slice cannot complete.
    - Move to the next independent slice.
    - Do not spend unbounded effort on a single failure.
 
 If a required tool is missing (linter, service, hardware access):
 - Install if possible.
-- Otherwise record in CURRENT-STATE as a blocker and move on.
+- Otherwise record in state.md as a blocker (`Blocked Kind: error`) and move on.
 
 ## Subagents
 
-- **planner** — design plans, implementation plans, revisions, strategic reviews (read-only + plan writes).
-- **critic** — adversarial review of plans. Emits verdict to CURRENT-STATE. SubagentStop hook verifies the verdict.
+- **planner** — design plans, implementation plans, revisions, strategic-review fallback (read-only + plan writes).
+- **critic** — adversarial review of plans. Emits verdict to state.md. SubagentStop hook verifies the verdict.
 - **product-owner** — user stories, acceptance criteria (design mode) / strategic validation (review mode). SubagentStop hook verifies artifacts.
-- **reviewer** — code review + security + doc-sync. Emits Review Verdict. SubagentStop hook verifies.
+- **reviewer** — code review + security + doc-sync **per slice** during `executing` only. Not invoked at the phase-level `reviewing` stage. Emits Review Verdict. SubagentStop hook verifies.
 - **tester** — writes tests from spec without reading implementation. Isolation hook-enforced.
 - **Explore** — broad read-only searches without polluting main context.
 - **designer**, **security-reviewer** — catalog agents. Only available if activated at bootstrap. Listed here so the picker works post-activation.
@@ -116,16 +134,16 @@ If a required tool is missing (linter, service, hardware access):
 
 Runs under **autopilot** (local) or **Copilot CLI** (background, worktree-isolated). Under autopilot:
 
-- Do **not** ask clarifying questions — autopilot auto-responds. Make evidence-based decisions, log the rationale to Session Log, record as an ADR if architectural.
-- The single hard human gate is **design plan approval** — always forces a session break via `Stage: blocked`.
-- Implementation plan approval and phase review are self-approved + logged under autopilot; interactive under manual mode.
+- Do **not** ask clarifying questions — autopilot auto-responds. Make evidence-based decisions, append rationale to `## Context` in CURRENT-STATE.md, record as an ADR if architectural.
+- The single hard human gate is **design plan approval** — always forces a session break via `Stage: blocked` + `Blocked Kind: awaiting-design-approval`. Resume with `/resume`.
+- Implementation plan approval and phase review are self-approved + recorded in CURRENT-STATE.md Context under autopilot; interactive under manual mode.
 - Tool-guardrails and stage-gate hooks are hard constraints regardless of mode.
 
 ## Non-negotiable rules
 
 - Do not advance past `design-critique` without a critic verdict of `approve` (or human-recorded `waived`).
 - Do not edit source files outside `executing` stage (stage-gate enforces; session-gate catches terminal bypass at session end).
-- Do not skip the reviewer on a slice that touches 3+ files.
+- Do not skip the reviewer on any slice. Every slice gets a reviewer pass.
 - Do not commit broken tests.
 - Do not declare completion without runnable evidence.
 - Do not rewrite VISION-LOCK.md to fit implementation shortcuts, or silently shrink scope.
@@ -141,8 +159,9 @@ Runs under **autopilot** (local) or **Copilot CLI** (background, worktree-isolat
 
 Before stopping, verify:
 
-1. CURRENT-STATE reflects reality (correct Stage, Slice Evidence, Session Log).
-2. `/memories/repo/` updated if this session discovered patterns, failures, or approaches worth carrying forward.
-3. All work committed.
+1. state.md reflects reality (correct Stage, Blocked Kind if blocked, Slice Evidence).
+2. CURRENT-STATE.md `## Context` has a one-line note about what this session accomplished or where it stopped.
+3. `/memories/repo/` updated if this session discovered patterns, failures, or approaches worth carrying forward.
+4. All work committed.
 
-If context is saturating, finish the current slice cleanly and stop — the next session resumes from CURRENT-STATE.
+If context is saturating, finish the current slice cleanly and stop — the next session resumes from state.md.

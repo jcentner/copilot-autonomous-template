@@ -11,7 +11,7 @@ You are converting an approved design into a slice-by-slice implementation plan 
 
 Before producing anything:
 
-1. Read `roadmap/CURRENT-STATE.md`.
+1. Read `roadmap/state.md`.
 2. Verify **Design Status** is `approved` or `waived`. If it is `draft`, `in-critique`, `revise`, or `rethink`, **stop** and report: "Design Status is `<value>` — design must be approved before implementation planning."
 3. Verify **Design Plan** field points to an existing file. If not, stop and report.
 
@@ -19,14 +19,14 @@ Do not proceed past this gate. The critic's SubagentStop hook protects the desig
 
 ## Required reads
 
-- The design plan referenced in CURRENT-STATE **Design Plan**
+- The design plan referenced in state.md **Design Plan**
 - [Architecture overview](../../docs/architecture/overview.md)
 - [Open questions](../../docs/reference/open-questions.md)
 - Relevant ADRs under `docs/architecture/decisions/`
 
 ## Task
 
-Write `roadmap/phases/phase-N-implementation.md` where `N` matches CURRENT-STATE **Phase**.
+Write `roadmap/phases/phase-N-implementation.md` where `N` matches state.md **Phase**.
 
 ### Required structure
 
@@ -34,7 +34,7 @@ Write `roadmap/phases/phase-N-implementation.md` where `N` matches CURRENT-STATE
 # Implementation Plan: Phase N — <Title>
 
 ## Design Reference
-Approved design: [phase-N-design.md](./phase-N-design.md) — as of CURRENT-STATE.
+Approved design: [phase-N-design.md](./phase-N-design.md) — as of state.md.
 
 ## Prerequisites
 - [ ] All open questions marked `must resolve before implementation` are resolved.
@@ -66,11 +66,10 @@ What the builder must verify before invoking the reviewer.
 
 ## After writing
 
-Update `roadmap/CURRENT-STATE.md`:
+Update `roadmap/state.md`:
 
 - Set **Implementation Plan** to the new file path.
 - Set **Implementation Status** to `draft`.
-- Append to Session Log: `- [ISO8601] implementation-plan: draft written to <path>`.
 
 ## Handoff
 

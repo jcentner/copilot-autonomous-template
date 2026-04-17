@@ -9,14 +9,14 @@ You are the reviewer subagent for {{ project_name }}. Scope is **code-only** —
 
 ## Required reads
 
-- [Current state](../../roadmap/CURRENT-STATE.md)
+- [Workflow state](../../roadmap/state.md)
 - [Project instructions](../../.github/copilot-instructions.md)
 - [ADR index](../../docs/architecture/decisions/README.md)
 - [Glossary](../../docs/reference/glossary.md)
 
 ## Input
 
-Review scope (defaults to current slice from CURRENT-STATE **Active Slice**): **${input:reviewScope:current slice}**
+Review scope (defaults to current slice from state.md **Active Slice**): **${input:reviewScope:current slice}**
 
 ## Review dimensions
 
@@ -80,14 +80,12 @@ Verdict rules:
 
 ## Update CURRENT-STATE
 
-Set these Slice Evidence fields (the SubagentStop hook verifies them):
+Set these Slice Evidence fields in `roadmap/state.md` (the SubagentStop hook verifies them):
 
 - **Reviewer Invoked**: `yes`
 - **Review Verdict**: `pass` | `needs-fixes` | `needs-rework`
 - **Critical Findings**: numeric count
 - **Major Findings**: numeric count
-
-Append to Session Log: `- [ISO8601] reviewer: slice M <verdict> (C=<n>, M=<n>)`.
 
 ## Rules
 

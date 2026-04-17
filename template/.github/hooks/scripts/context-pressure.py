@@ -8,10 +8,12 @@ to checkpoint and consider wrapping up.
 Advisory only — never blocks. Uses a temp file keyed on sessionId to track
 state across hook invocations within a session.
 """
+import hashlib
 import json
 import os
 import sys
 import tempfile
+import time
 
 
 # Default threshold in bytes (400KB of accumulated tool I/O)
@@ -20,10 +22,50 @@ THRESHOLD = int(os.environ.get("CONTEXT_THRESHOLD", 400_000))
 # State file location — one per session
 STATE_DIR = os.path.join(tempfile.gettempdir(), "copilot-context-monitor")
 
+# Drop per-session state files older than this many seconds. 7 days is long
+# enough to span an extended project pause without eating disk.
+STATE_TTL_SECONDS = 7 * 24 * 3600
+
+
+def derive_session_id(input_data):
+    """Use the model-provided sessionId when present; otherwise derive a
+    stable fallback from (cwd, ppid) so sessions under the same VS Code
+    window share a state file even when no sessionId is supplied."""
+    sid = input_data.get("sessionId")
+    if sid:
+        return str(sid)
+    cwd = input_data.get("cwd") or os.getcwd()
+    ppid = os.getppid()
+    digest = hashlib.sha1(f"{cwd}|{ppid}".encode("utf-8")).hexdigest()[:12]
+    return f"nosid-{digest}"
+
 
 def get_state_file(session_id):
     os.makedirs(STATE_DIR, exist_ok=True)
     return os.path.join(STATE_DIR, f"{session_id}.json")
+
+
+def prune_stale(now=None):
+    """Remove per-session state files older than STATE_TTL_SECONDS.
+
+    Errors are swallowed — this is best-effort housekeeping and must never
+    break the hook contract.
+    """
+    if now is None:
+        now = time.time()
+    try:
+        if not os.path.isdir(STATE_DIR):
+            return
+        cutoff = now - STATE_TTL_SECONDS
+        for name in os.listdir(STATE_DIR):
+            path = os.path.join(STATE_DIR, name)
+            try:
+                if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+            except OSError:
+                continue
+    except OSError:
+        return
 
 
 def load_state(state_file):
@@ -48,8 +90,10 @@ def main():
         json.dump({}, sys.stdout)
         return
 
-    session_id = input_data.get("sessionId", "unknown")
+    session_id = derive_session_id(input_data)
     tool_response = input_data.get("tool_response", "")
+
+    prune_stale()
 
     state_file = get_state_file(session_id)
     state = load_state(state_file)

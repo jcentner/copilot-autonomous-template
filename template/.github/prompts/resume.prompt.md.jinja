@@ -1,0 +1,103 @@
+---
+description: "Unblock a session that hit a Stage: blocked checkpoint — design approval, vision update, error recovery, or other human gates."
+agent: agent
+---
+
+# Resume
+
+You are unblocking a session of {{ project_name }} that has set
+`Stage: blocked` in `roadmap/state.md`. This prompt routes the resume based
+on the `Blocked Kind` field, which the autonomous-builder always sets when
+it transitions to `blocked`.
+
+## Precondition
+
+1. Read `roadmap/state.md`.
+2. Verify `Stage` is `blocked`. If not, stop and report the current stage.
+3. Note `Blocked Kind` and `Blocked Reason`.
+
+If `Blocked Kind` is `n/a` or missing, the session-gate hook will already
+have flagged this; ask the human to set `Blocked Kind` to one of the valid
+values before resuming.
+
+## Routing by Blocked Kind
+
+### `awaiting-design-approval`
+
+The autonomous-builder finished a design plan + critique cycle and is
+waiting for you to approve the design before implementation planning begins.
+
+1. Show the human the approved design plan (path is in `Design Plan` field
+   of `state.md`).
+2. Use `vscode_askQuestions` to confirm:
+   - **Approve**: design is sound; proceed to implementation planning.
+   - **Revise**: design needs more work; route back to `design-critique`.
+   - **Abandon**: kill this phase entirely.
+
+3. On **Approve**:
+   - Set `Stage: implementation-planning`.
+   - Set `Blocked Kind: n/a`.
+   - Clear `Blocked Reason: n/a`.
+   - Append to `## Context` in `CURRENT-STATE.md`: `[ISO8601] resume: design approved by human, advancing to implementation-planning`.
+
+4. On **Revise**:
+   - Set `Stage: design-critique`.
+   - Set `Design Status: revise`.
+   - Set `Blocked Kind: n/a`.
+   - Record human feedback in `Blocked Reason` (will be cleared by next planner pass) or directly in the design plan.
+
+5. On **Abandon**:
+   - Leave `Stage: blocked`.
+   - Set `Blocked Kind: awaiting-human-decision`.
+   - Set `Blocked Reason: "Human abandoned phase N — needs new direction."`.
+
+### `awaiting-vision-update` / `vision-exhausted`
+
+The vision needs to be expanded or rewritten before work can continue.
+
+1. Hand off to `/vision-expand` (or run it now).
+2. After the new vision is written, `/vision-expand` advances `Stage` to
+   `planning` itself — no manual edit needed.
+
+### `awaiting-human-decision`
+
+A non-design human decision is required. The question is in `Blocked Reason`.
+
+1. Read `Blocked Reason` aloud (or display via `vscode_askQuestions`).
+2. After the human answers, the answer determines the next stage. If you
+   can infer it from the answer, set `Stage` accordingly. Otherwise, ask the
+   human which stage to resume in.
+3. Set `Blocked Kind: n/a`, clear `Blocked Reason`.
+4. Append to `## Context` in `CURRENT-STATE.md`.
+
+### `error`
+
+The builder hit a condition it could not recover from. Manual diagnosis is
+required — do **not** auto-resume.
+
+1. Read `Blocked Reason` and the latest entries in
+   `roadmap/sessions/<latest>.md`.
+2. Help the human diagnose the failure.
+3. Once fixed, ask the human to set `Stage` and `Blocked Kind: n/a` manually,
+   or assist them in doing so once the underlying cause is resolved.
+
+## State updates
+
+Every successful resume must:
+
+- Set `Blocked Kind: n/a`.
+- Set the new `Stage` value.
+- Update `Blocked Reason` to `n/a` (or replace with new context if re-blocking).
+- Append a one-line entry to `## Context` in `CURRENT-STATE.md` summarising
+  the resume decision.
+
+The session-gate hook validates the new state on next stop.
+
+## Rules
+
+- Do not advance past `blocked` without an explicit human decision in this
+  prompt. Autopilot must not auto-resume `blocked` sessions.
+- Do not edit source code. This prompt only mutates `state.md` and
+  `CURRENT-STATE.md`.
+- If the new `Stage` is `executing`, verify both `Design Status` and
+  `Implementation Status` are `approved` first; refuse otherwise.

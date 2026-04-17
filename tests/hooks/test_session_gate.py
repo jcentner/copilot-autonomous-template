@@ -27,9 +27,31 @@ class SessionGateTests(unittest.TestCase):
 
     # --- Allow cases ---
 
-    def test_blocked_stage_allows_stop(self):
-        out = self._run(stage="blocked")
+    def test_blocked_stage_with_kind_allows(self):
+        out = self._run(stage="blocked", blocked_kind="awaiting-design-approval")
         self.assertEqual(self._decision(out), "allow")
+
+    def test_blocked_without_kind_blocks(self):
+        out = self._run(stage="blocked", blocked_kind="n/a")
+        self.assertEqual(self._decision(out), "block")
+        self.assertIn("Blocked Kind", out["hookSpecificOutput"]["reason"])
+
+    def test_blocked_with_invalid_kind_blocks(self):
+        out = self._run(stage="blocked", blocked_kind="made-up-kind")
+        self.assertEqual(self._decision(out), "block")
+        self.assertIn("Blocked Kind", out["hookSpecificOutput"]["reason"])
+
+    def test_blocked_each_valid_kind_allows(self):
+        for kind in (
+            "awaiting-design-approval",
+            "awaiting-vision-update",
+            "awaiting-human-decision",
+            "error",
+            "vision-exhausted",
+        ):
+            with self.subTest(kind=kind):
+                out = self._run(stage="blocked", blocked_kind=kind)
+                self.assertEqual(self._decision(out), "allow")
 
     def test_complete_stage_allows_stop(self):
         out = self._run(stage="complete")
@@ -87,6 +109,36 @@ class SessionGateTests(unittest.TestCase):
         out = self._run(stage="executing", committed="no")
         self.assertEqual(self._decision(out), "block")
         self.assertIn("Committed", out["hookSpecificOutput"]["reason"])
+
+    # --- Bug C regression: Evidence For Slice must match Active Slice. ---
+
+    def test_executing_blocks_on_stale_evidence_from_prior_slice(self):
+        # Active Slice advanced to 2 but evidence still bound to slice 1.
+        out = self._run(
+            stage="executing",
+            active_slice=2,
+            evidence_for_slice=1,
+        )
+        self.assertEqual(self._decision(out), "block")
+        self.assertIn("Evidence For Slice", out["hookSpecificOutput"]["reason"])
+
+    def test_executing_blocks_when_evidence_for_slice_unset(self):
+        # Active Slice set but no evidence recorded for it yet.
+        out = self._run(
+            stage="executing",
+            active_slice=2,
+            evidence_for_slice="n/a",
+        )
+        self.assertEqual(self._decision(out), "block")
+        self.assertIn("Evidence For Slice", out["hookSpecificOutput"]["reason"])
+
+    def test_executing_allows_when_evidence_matches_active_slice(self):
+        out = self._run(
+            stage="executing",
+            active_slice=2,
+            evidence_for_slice=2,
+        )
+        self.assertEqual(self._decision(out), "allow")
 
     def test_reviewing_blocks_on_pending_strategic(self):
         out = self._run(stage="reviewing", strategic_review="pending")

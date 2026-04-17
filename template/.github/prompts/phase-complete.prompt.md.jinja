@@ -9,12 +9,12 @@ You are completing the current phase of {{ project_name }}. This prompt drives t
 
 ## Precondition
 
-- Read `roadmap/CURRENT-STATE.md`.
+- Read `roadmap/state.md` and `roadmap/CURRENT-STATE.md`.
 - **Stage** should be `cleanup` (or `reviewing` if strategic review already passed). If earlier, stop and report.
 
 ## Required reads
 
-- Design plan + implementation plan referenced in CURRENT-STATE.
+- Design plan + implementation plan referenced in state.md.
 - All slice review files (`roadmap/phases/phase-N-review-slice-*.md`).
 - Strategic review (`roadmap/phases/phase-N-strategic-review.md`).
 
@@ -22,7 +22,7 @@ You are completing the current phase of {{ project_name }}. This prompt drives t
 
 ### 1. Verify acceptance criteria against the design plan
 - Walk each criterion. Confirm evidence (commit, test, demo).
-- Document any waived criterion in CURRENT-STATE `## Waivers`.
+- Document any waived criterion in `CURRENT-STATE.md` `## Waivers`.
 
 ### 2. Record ADRs
 - For each architectural decision made during this phase, create an ADR under `docs/architecture/decisions/`.
@@ -47,21 +47,22 @@ You are completing the current phase of {{ project_name }}. This prompt drives t
 
 ### 7. Vision lock updates
 - If learnings adjusted within-scope constraints or priorities, update `docs/vision/VISION-LOCK.md` in place, bump minor version, append changelog entry.
-- If goals/scope changed, **do not** edit the vision lock. Propose updates in CURRENT-STATE under `## Proposed Vision Updates` and set **Stage** to `blocked` with `Blocked Reason: "Vision update needs human review."`.
+- If goals/scope changed, **do not** edit the vision lock. Propose updates in `CURRENT-STATE.md` under `## Proposed Vision Updates`, then in `state.md` set **Stage** to `blocked`, **Blocked Kind** to `awaiting-vision-update`, and **Blocked Reason** to `"Vision update needs human review."`.
 
-### 8. Complete the Phase Completion Checklist in CURRENT-STATE
-- Check every box in the `## Phase Completion Checklist` section.
+### 8. Complete the Phase Completion Checklist in state.md
+- Check every box in the `## Phase Completion Checklist` section of `roadmap/state.md`.
 - The session-gate hook blocks session end during `cleanup` until every box is checked.
 
 ### 9. Advance the state machine
 - Increment **Phase** by 1.
-- Reset Slice Evidence fields: `Tests Written: n/a`, `Tests Pass: n/a`, `Reviewer Invoked: n/a`, `Review Verdict: n/a`, `Critical Findings: 0`, `Major Findings: 0`, `Strategic Review: n/a`, `Committed: n/a`.
+- Clear `Phase Title` (next phase's planner sets it during `planning`).
+- Reset Slice Evidence fields: `Evidence For Slice: n/a`, `Tests Written: n/a`, `Tests Pass: n/a`, `Reviewer Invoked: n/a`, `Review Verdict: n/a`, `Critical Findings: 0`, `Major Findings: 0`, `Strategic Review: n/a`, `Committed: n/a`.
 - Reset `Active Slice: 1`, `Slice Total: n/a`.
 - Clear `Design Plan`, `Implementation Plan` (they will be set by next phase's planner).
 - Set `Design Status: n/a`, `Implementation Status: n/a`.
 - Reset `Design Critique Rounds: 0`, `Implementation Critique Rounds: 0`.
+- Reset `Blocked Kind: n/a`, `Blocked Reason: n/a`.
 - Set **Stage** to `planning`.
-- Append to Session Log: `- [ISO8601] phase-complete: phase N wrapped, advancing to phase N+1`.
 
 ## Output
 
@@ -76,5 +77,5 @@ After the state machine advances, summarize:
 ## Rules
 
 - Do not skip steps. The checklist is the gate.
-- Do not edit the vision lock for goal/scope changes — propose in CURRENT-STATE.
+- Do not edit the vision lock for goal/scope changes — propose in `CURRENT-STATE.md`.
 - Do not mark a criterion as met without evidence.

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """PreToolUse hook: Stage gate.
 
-Blocks code-editing tools during non-executing stages of the workflow pipeline.
-Only allows edits to `roadmap/**`, `docs/**`, and `.github/**` when Stage is
-anything other than `executing`, `bootstrap`, or `cleanup`.
+Blocks code-editing tools during non-executing stages. Only allows edits to
+`roadmap/**`, `docs/**`, and `.github/**` when Stage is anything other than
+`executing` or `bootstrap`.
 
-Reads Stage from `roadmap/CURRENT-STATE.md`. If the file is missing, allows
+Reads Stage from `roadmap/state.md`. If the file is missing, allows
 (bootstrap edge case).
 
-Terminal commands (`run_in_terminal`) are allowed at this layer — terminal-based
-bypass (e.g., `echo ... > src/foo.py`) is caught at session end by
+Terminal commands (`run_in_terminal`) are allowed at this layer — terminal-
+based bypass (e.g., `echo ... > src/foo.py`) is caught at session end by
 `session-gate.py`'s git-diff backstop.
 
 Return schema (per Copilot hooks docs):
@@ -22,6 +22,8 @@ Return schema (per Copilot hooks docs):
 import json
 import os
 import sys
+
+from _state_io import VALID_STAGES, get_field, state_exists
 
 
 EDIT_TOOLS = {
@@ -38,20 +40,11 @@ ALLOWLISTED_PREFIXES = (
 )
 
 # Stages where edits are unrestricted.
-UNRESTRICTED_STAGES = {"executing", "bootstrap", "cleanup"}
-
-VALID_STAGES = {
-    "bootstrap",
-    "planning",
-    "design-critique",
-    "implementation-planning",
-    "implementation-critique",
-    "executing",
-    "reviewing",
-    "cleanup",
-    "blocked",
-    "complete",
-}
+# `cleanup` is intentionally NOT in this set: during phase wrap-up, only
+# doc/roadmap/.github edits should happen. If a source fix is genuinely
+# needed during cleanup, reopen a slice under `executing` rather than
+# smuggling source edits through cleanup.
+UNRESTRICTED_STAGES = {"executing", "bootstrap"}
 
 
 def allow(reason=""):
@@ -79,62 +72,51 @@ def deny(reason):
     )
 
 
-def read_stage(cwd):
-    """Return the current Stage value, or None if unreadable."""
-    path = os.path.join(cwd, "roadmap", "CURRENT-STATE.md")
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, encoding="utf-8") as f:
-            content = f.read()
-    except OSError:
-        return None
-    for line in content.splitlines():
-        stripped = line.strip().lower()
-        # Match lines like `- **Stage**: planning`
-        if "**stage**:" in stripped:
-            value = stripped.split("**stage**:", 1)[1].strip()
-            # Strip trailing markdown/comment cruft
-            value = value.split("<", 1)[0].strip()
-            return value
-    return None
-
-
 def normalize_path(path, cwd):
     """Normalize a tool-call path to a workspace-relative forward-slash string."""
     if not path:
         return ""
-    # Handle both absolute and relative
     if os.path.isabs(path):
         try:
             path = os.path.relpath(path, cwd)
         except ValueError:
-            # Different drive on Windows — treat as outside workspace
             return path.replace("\\", "/")
-    # Normalize separators and collapse ./, ../
     path = os.path.normpath(path).replace("\\", "/")
     return path
 
 
-def extract_target_path(tool_name, tool_input):
-    """Return the target filesystem path from a tool-call payload, or ''."""
+def extract_target_paths(tool_name, tool_input):
+    """Return all target filesystem paths from a tool-call payload.
+
+    Returns a list because `multi_replace_string_in_file` carries multiple
+    replacements; we must check every one.
+    """
     if tool_name == "create_file":
-        return tool_input.get("filePath", "") or tool_input.get("file_path", "")
+        p = tool_input.get("filePath", "") or tool_input.get("file_path", "")
+        return [p] if p else []
     if tool_name in ("replace_string_in_file", "edit_notebook_file"):
-        return tool_input.get("filePath", "") or tool_input.get("file_path", "")
+        p = tool_input.get("filePath", "") or tool_input.get("file_path", "")
+        return [p] if p else []
     if tool_name == "multi_replace_string_in_file":
         replacements = tool_input.get("replacements") or []
-        if replacements and isinstance(replacements, list):
-            first = replacements[0] or {}
-            return first.get("filePath", "") or first.get("file_path", "")
-    return ""
+        if not isinstance(replacements, list):
+            return []
+        paths = []
+        for r in replacements:
+            if not isinstance(r, dict):
+                continue
+            p = r.get("filePath", "") or r.get("file_path", "")
+            if p:
+                paths.append(p)
+        return paths
+    return []
 
 
 def path_is_allowlisted(rel_path):
     """True if path is under roadmap/, docs/, or .github/."""
     if not rel_path:
         return False
-    # Path traversal guard — if .. still present after normpath, refuse
+    # Path traversal guard — if .. still present after normpath, refuse.
     if rel_path.startswith("../") or rel_path == "..":
         return False
     return any(rel_path.startswith(prefix) for prefix in ALLOWLISTED_PREFIXES)
@@ -151,16 +133,24 @@ def main():
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {}) or {}
 
-    stage = read_stage(cwd)
-
-    # Missing or unreadable state → allow (bootstrap edge case).
-    if stage is None:
+    # Missing or unreadable state → allow (bootstrap edge case, fresh workspace).
+    if not state_exists(cwd):
         allow()
         return
 
-    # Unknown stage value → allow but note reason (fail-open to avoid bricking sessions).
+    stage = get_field(cwd, "Stage")
+    if not stage:
+        allow()
+        return
+
+    # Unknown stage value → fail CLOSED. A typo in the state file
+    # (e.g., `implementaion-critique`) must not silently disable the gate.
     if stage not in VALID_STAGES:
-        allow(f"Unknown Stage value '{stage}'; allowing by default.")
+        deny(
+            f"Unknown Stage value '{stage}' in roadmap/state.md. "
+            f"Valid values: {', '.join(sorted(VALID_STAGES))}. "
+            f"Fix the Stage field before continuing."
+        )
         return
 
     # Unrestricted stages.
@@ -168,7 +158,8 @@ def main():
         allow()
         return
 
-    # Terminal commands are not path-gated here — session-gate catches source edits at stop.
+    # Terminal commands are not path-gated here — session-gate catches source
+    # edits at stop via git diff.
     if tool_name == "run_in_terminal":
         allow()
         return
@@ -178,19 +169,26 @@ def main():
         allow()
         return
 
-    target = extract_target_path(tool_name, tool_input)
-    rel = normalize_path(target, cwd)
-
-    if path_is_allowlisted(rel):
+    targets = extract_target_paths(tool_name, tool_input)
+    # No identifiable target → conservative allow (lets edits with unusual
+    # payload shapes through; tested edit tools always carry filePath).
+    if not targets:
         allow()
         return
 
-    deny(
-        f"Stage is '{stage}' — edits to '{rel or target}' are blocked. "
-        "During non-executing stages, only edits under roadmap/, docs/, or .github/ "
-        "are permitted. Advance Stage to 'executing' by completing plan approval "
-        "first, or redirect this edit to an allowed path."
-    )
+    for raw in targets:
+        rel = normalize_path(raw, cwd)
+        if not path_is_allowlisted(rel):
+            deny(
+                f"Stage is '{stage}' — edits to '{rel or raw}' are blocked. "
+                "During non-executing stages, only edits under roadmap/, docs/, "
+                "or .github/ are permitted. Advance Stage to 'executing' by "
+                "completing plan approval first, or redirect this edit to an "
+                "allowed path."
+            )
+            return
+
+    allow()
 
 
 if __name__ == "__main__":

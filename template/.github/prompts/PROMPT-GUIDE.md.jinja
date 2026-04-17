@@ -14,7 +14,7 @@ Or with Copilot CLI (background, worktree-isolated):
 VS Code Chat → Session Target → Copilot CLI → select autonomous-builder agent → describe your goal
 ```
 
-The builder reads `roadmap/CURRENT-STATE.md`, picks up where it left off, and runs a continuous loop: plan → implement → test → review → commit → checkpoint. It uses subagents for research (planner), testing (tester), and review (reviewer).
+The builder reads `roadmap/state.md` (and the narrative in `roadmap/CURRENT-STATE.md`), picks up where it left off, and runs a continuous loop: plan → implement → test → review → commit → checkpoint. It uses subagents for research (planner), testing (tester), and per-slice review (reviewer).
 
 ### First session (greenfield or existing)
 
@@ -32,8 +32,7 @@ For fully autonomous sessions, enable these VS Code settings:
 | Setting | Value | Purpose |
 |---------|-------|---------|
 | `chat.autopilot.enabled` | `true` | Auto-approve + auto-respond |
-| `chat.agent.sandbox` | `true` | Restrict writes to workspace |
-| `chat.useCustomAgentHooks` | `true` | Enable Stop hook (prevents premature stopping) |
+| `chat.useCustomAgentHooks` | `true` | Enable Stop / PreToolUse / PostToolUse / SubagentStop hooks (required) |
 
 ## Manual Override Prompts
 
@@ -45,11 +44,12 @@ Prompts are **human override entry points**. The autonomous builder orchestrates
 | `/design-plan` | Produce user stories, acceptance criteria, non-goals, risks, ADR candidates, test strategy, slice breakdown | `planning` | planner |
 | `/implementation-plan` | Convert an approved design into a file-by-file slice plan | `implementation-planning` | planner |
 | `/implement` | Execute one slice of the approved implementation plan via the slice loop | `executing` | agent |
-| `/code-review` | Code-focused review: architecture, quality, tests, docs-sync, security | `executing` (per slice) / `reviewing` | reviewer |
-| `/strategic-review` | Validate shipped phase against design intent + acceptance criteria | `reviewing` | product-owner |
+| `/code-review` | Per-slice code review: architecture, quality, tests, docs-sync, security | `executing` (per slice) | reviewer |
+| `/strategic-review` | Phase-level strategic review ("did we build the right thing?") | `reviewing` | product-owner / planner |
+| `/resume` | Unblock a session by routing on `Blocked Kind` (design approval, vision update, human decision, error) | `blocked` | (root) |
 | `/phase-complete` | Cleanup checklist: ADRs, docs, wrap summary, advance state machine | `cleanup` | agent |
 
-Each prompt reads and writes machine-readable fields in `roadmap/CURRENT-STATE.md`. SubagentStop and PreToolUse hooks verify that writes happened correctly.
+Each prompt reads and writes machine-readable fields in `roadmap/state.md`. SubagentStop and PreToolUse hooks verify that writes happened correctly.
 
 ## Custom Agents
 

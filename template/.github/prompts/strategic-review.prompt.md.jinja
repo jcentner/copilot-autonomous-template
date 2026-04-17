@@ -11,7 +11,7 @@ If the **product-owner** agent is not active in this repo, the **planner** perfo
 
 ## Precondition
 
-- Read `roadmap/CURRENT-STATE.md`.
+- Read `roadmap/state.md`.
 - Verify **Stage** is `reviewing` (or `cleanup` if catching up late). If earlier, stop and report the stage.
 - Note the **Design Plan** and **Implementation Plan** paths.
 
@@ -70,11 +70,9 @@ Verdict rules:
 
 ## Update CURRENT-STATE
 
-Set **Strategic Review** to `pass`, `replan`, or `n/a` (the SubagentStop hook verifies this terminal value).
+Set **Strategic Review** in `roadmap/state.md` to `pass`, `replan`, or `n/a` (the SubagentStop hook verifies this terminal value).
 
-Append to Session Log: `- [ISO8601] strategic-review: <verdict> — <one-line rationale>`.
-
-If verdict is `replan`, set **Blocked Reason** to summarize the replan and let the builder transition to `blocked` for human review.
+If verdict is `replan`, set **Blocked Reason** to summarize the replan and **Blocked Kind** to `awaiting-human-decision`, then let the builder transition to `blocked` for human review.
 
 ## Rules
 

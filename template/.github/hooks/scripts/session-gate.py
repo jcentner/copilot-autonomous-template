@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Stop hook: Session gate.
 
-Replaces the prior `slice-gate.py`. Parses machine-readable state from
-`roadmap/CURRENT-STATE.md` and blocks session stop when the current stage
-has unmet requirements.
+Parses machine-readable state from `roadmap/state.md` and blocks session stop
+when the current stage has unmet requirements.
 
 Also runs a git-diff backstop: during non-executing stages, if source files
 outside the allowlist have been modified (e.g., via `run_in_terminal` bypass
 of `stage-gate.py`), block stop and demand revert or stage advance.
+
+Stage = `blocked` only allows stop when `Blocked Kind` is set to a valid
+value — this prevents an agent from setting `Stage: blocked` with no
+explanation as a way to bypass the gate.
 
 Return schema (per Copilot hooks docs):
     {"hookSpecificOutput": {
@@ -19,9 +22,15 @@ Empty object on allow.
 """
 import json
 import os
-import re
 import subprocess
 import sys
+
+from _state_io import (
+    VALID_BLOCKED_KINDS,
+    VALID_STAGES,
+    parse_state,
+    state_exists,
+)
 
 
 ALLOWLISTED_PREFIXES = ("roadmap/", "docs/", ".github/")
@@ -34,10 +43,7 @@ NON_EXECUTING_STAGES = {
     "reviewing",
 }
 
-# Slice Evidence values that indicate the slice is not yet complete.
 INCOMPLETE_SLICE_VALUES = {"pending", "no"}
-
-# Terminal Review Verdict values.
 TERMINAL_REVIEW_VERDICTS = {"pass", "n/a"}
 BLOCKING_REVIEW_VERDICTS = {"pending", "needs-fixes", "needs-rework"}
 
@@ -59,47 +65,12 @@ def allow():
     json.dump({}, sys.stdout)
 
 
-def parse_state(cwd):
-    """Return a dict of lowercase field-name → string-value parsed from CURRENT-STATE.md."""
-    path = os.path.join(cwd, "roadmap", "CURRENT-STATE.md")
-    fields = {}
-    checklist_unchecked = []
-    if not os.path.exists(path):
-        return fields, checklist_unchecked
-    try:
-        with open(path, encoding="utf-8") as f:
-            lines = f.readlines()
-    except OSError:
-        return fields, checklist_unchecked
-
-    field_re = re.compile(r"^\s*-\s+\*\*([^*]+)\*\*:\s*(.*?)\s*$")
-    unchecked_re = re.compile(r"^\s*-\s+\[ \]\s+(.*?)\s*$")
-    in_checklist = False
-    for raw in lines:
-        heading = raw.strip().lower()
-        if heading.startswith("## "):
-            in_checklist = heading == "## phase completion checklist"
-            continue
-        m = field_re.match(raw)
-        if m:
-            key = m.group(1).strip().lower()
-            val = m.group(2).strip()
-            # Strip inline HTML comments.
-            val = re.sub(r"<!--.*?-->", "", val).strip()
-            fields[key] = val
-        elif in_checklist:
-            u = unchecked_re.match(raw)
-            if u:
-                checklist_unchecked.append(u.group(1).strip())
-    return fields, checklist_unchecked
-
-
 def get(fields, key, default=""):
     return fields.get(key, default).strip().lower()
 
 
 def git_diff_source_changes(cwd):
-    """Return list of paths changed (vs HEAD) that are outside the allowlist.
+    """Return list of paths changed (vs HEAD) outside the allowlist.
 
     Returns [] on git errors (missing git, unborn HEAD, etc.).
     """
@@ -115,10 +86,9 @@ def git_diff_source_changes(cwd):
     if result.returncode != 0:
         return []
     changed = [p.strip() for p in result.stdout.splitlines() if p.strip()]
-    outside = [
+    return [
         p for p in changed if not any(p.startswith(pref) for pref in ALLOWLISTED_PREFIXES)
     ]
-    return outside
 
 
 def main():
@@ -133,17 +103,46 @@ def main():
         return
 
     cwd = input_data.get("cwd", ".")
-    fields, unchecked = parse_state(cwd)
 
+    if not state_exists(cwd):
+        # No state file → allow (fresh workspace / bootstrap).
+        allow()
+        return
+
+    fields, unchecked = parse_state(cwd)
     stage = get(fields, "stage")
 
-    # No state file, or stage unreadable → allow (bootstrap / fresh workspace).
     if not stage:
         allow()
         return
 
-    # Explicit escape hatches.
-    if stage in ("blocked", "complete"):
+    # Unknown stage value → fail CLOSED.
+    if stage not in VALID_STAGES:
+        block(
+            f"Unknown Stage value '{stage}' in roadmap/state.md. "
+            f"Valid values: {', '.join(sorted(VALID_STAGES))}. "
+            f"Fix the Stage field before stopping."
+        )
+        return
+
+    # `complete` allows stop unconditionally — vision exhausted.
+    if stage == "complete":
+        allow()
+        return
+
+    # `blocked` allows stop only when Blocked Kind is set to a valid value.
+    # Without that requirement, an agent could set `Stage: blocked` with no
+    # explanation as a Stop-hook bypass.
+    if stage == "blocked":
+        kind = get(fields, "blocked kind")
+        if kind not in VALID_BLOCKED_KINDS:
+            block(
+                f"Stage is 'blocked' but Blocked Kind is '{kind or 'unset'}'. "
+                f"Set Blocked Kind in roadmap/state.md to one of "
+                f"{', '.join(sorted(VALID_BLOCKED_KINDS))} and explain the "
+                f"situation in Blocked Reason. Use /resume to unblock."
+            )
+            return
         allow()
         return
 
@@ -156,14 +155,35 @@ def main():
             block(
                 f"Stage is '{stage}' but source files outside the allowlist have "
                 f"been modified: {sample}{more}. Revert with "
-                f"`git checkout -- <path>`, stash the changes, or advance Stage to "
-                f"'executing' (requires approved design + implementation plans)."
+                f"`git checkout -- <path>`, stash the changes, or advance Stage "
+                f"to 'executing' (requires approved design + implementation plans)."
             )
             return
 
     # Stage-specific field gates.
     if stage == "executing":
         reasons = []
+
+        # Bug C: bind slice evidence to the current Active Slice. If the agent
+        # has incremented Active Slice without resetting evidence (or without
+        # rerunning write-test-evidence.py for the new slice), this catches it.
+        active_slice = (fields.get("active slice", "") or "").strip()
+        evidence_for = (fields.get("evidence for slice", "") or "").strip()
+        if active_slice and active_slice.lower() not in ("n/a", ""):
+            if not evidence_for or evidence_for.lower() == "n/a":
+                reasons.append(
+                    f"Evidence For Slice is unset but Active Slice is {active_slice} "
+                    f"— run write-test-evidence.py for slice {active_slice}"
+                )
+            elif evidence_for != active_slice:
+                reasons.append(
+                    f"Evidence For Slice is '{evidence_for}' but Active Slice is "
+                    f"'{active_slice}' — stale evidence from a prior slice. Reset "
+                    f"Tests Written / Tests Pass / Reviewer Invoked / Review Verdict "
+                    f"/ Critical Findings / Major Findings / Committed to pending, "
+                    f"then complete the slice loop and rerun write-test-evidence.py"
+                )
+
         tests_pass = get(fields, "tests pass")
         if tests_pass in INCOMPLETE_SLICE_VALUES:
             reasons.append(f"Tests Pass is '{tests_pass}' (need 'yes' or 'n/a')")
@@ -204,7 +224,7 @@ def main():
                 + "; ".join(reasons)
                 + ". Finish the slice loop before stopping: run tests, invoke the "
                 "reviewer, fix Critical/Major findings, commit, and update the "
-                "Slice Evidence fields in roadmap/CURRENT-STATE.md."
+                "Slice Evidence fields in roadmap/state.md."
             )
             return
 
@@ -212,10 +232,10 @@ def main():
         strategic = get(fields, "strategic review")
         if strategic == "pending":
             block(
-                "Stage is 'reviewing' but Strategic Review is 'pending'. Invoke the "
-                "product-owner (or planner) to perform strategic review, then set "
-                "Strategic Review to 'pass', 'replan', or 'n/a' in "
-                "roadmap/CURRENT-STATE.md."
+                "Stage is 'reviewing' but Strategic Review is 'pending'. Invoke "
+                "the product-owner (or planner) to perform strategic review, "
+                "then set Strategic Review to 'pass', 'replan', or 'n/a' in "
+                "roadmap/state.md."
             )
             return
 
@@ -224,9 +244,9 @@ def main():
             sample = "; ".join(unchecked[:3])
             more = f" (+{len(unchecked) - 3} more)" if len(unchecked) > 3 else ""
             block(
-                f"Stage is 'cleanup' with unchecked Phase Completion Checklist items: "
-                f"{sample}{more}. Complete the phase-complete protocol and check all "
-                f"items in roadmap/CURRENT-STATE.md before stopping."
+                f"Stage is 'cleanup' with unchecked Phase Completion Checklist "
+                f"items: {sample}{more}. Complete the phase-complete protocol "
+                f"and check all items in roadmap/state.md before stopping."
             )
             return
 
@@ -250,7 +270,6 @@ def main():
             )
             return
 
-    # All checks passed.
     allow()
 
 

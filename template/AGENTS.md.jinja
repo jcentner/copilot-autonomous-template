@@ -7,7 +7,7 @@ Cross-agent instructions recognized by GitHub Copilot, Claude Code, and other AI
 ## Conventions
 
 - **Language**: {{ language }}
-- **Checkpoint file**: [`roadmap/CURRENT-STATE.md`](roadmap/CURRENT-STATE.md) — read first every session. Machine-readable; hooks parse it.
+- **Checkpoint files**: [`roadmap/state.md`](roadmap/state.md) (machine-readable; hooks parse it) and [`roadmap/CURRENT-STATE.md`](roadmap/CURRENT-STATE.md) (narrative). Read both first every session.
 - **Vision lock**: [`docs/vision/VISION-LOCK.md`](docs/vision/VISION-LOCK.md) — highest-authority document.
 - **ADRs**: [`docs/architecture/decisions/`](docs/architecture/decisions/)
 - **Open questions**: [`docs/reference/open-questions.md`](docs/reference/open-questions.md)
@@ -21,7 +21,7 @@ Core (shipped by default):
 
 | Agent | Role |
 |-------|------|
-| `autonomous-builder` | Stage orchestrator. Dispatches subagents based on `Stage` in CURRENT-STATE. |
+| `autonomous-builder` | Stage orchestrator. Dispatches subagents based on `Stage` in state.md. |
 | `planner` | Design plans, implementation plans, revisions, strategic-review fallback. Read + plan-file writes. |
 | `critic` | Adversarial review of design + implementation plans. SubagentStop-verified verdict. |
 | `product-owner` | User stories (design mode) / strategic review (review mode). SubagentStop-verified. |
@@ -37,10 +37,19 @@ Catalog (activated on demand at bootstrap):
 
 ## Stage pipeline
 
-`bootstrap → planning → design-critique → (blocked — human approval) → implementation-planning → implementation-critique → executing → reviewing → cleanup → planning`
+`bootstrap → planning → design-critique → (blocked, Blocked Kind=awaiting-design-approval) → implementation-planning → implementation-critique → executing → reviewing → cleanup → planning`
 
-The single hard human gate under autopilot is **design plan approval**, enforced by the builder transitioning to `Stage: blocked`.
+The `blocked` step on this line is a **scheduled** interruption for design approval — not a generic error state. `Blocked Kind` distinguishes the cause:
 
+- `awaiting-design-approval` — this scheduled approval gate.
+- `awaiting-vision-update` — phase-complete proposed a vision change.
+- `awaiting-human-decision` — a non-design decision surfaced.
+- `error` — irrecoverable runtime failure (out-of-band; not part of the normal flow).
+- `vision-exhausted` — all roadmap phases completed; next step is `/vision-expand`.
+
+After any `blocked` session, run `/resume` to route on `Blocked Kind`. The session-gate hook refuses to allow a session to stop with `Stage: blocked` unless `Blocked Kind` is one of the values above — “blocked with no reason” is not a valid exit.
+
+The single hard human gate under autopilot is **design plan approval**, enforced by the builder transitioning to `Stage: blocked` with `Blocked Kind: awaiting-design-approval`.
 ## Prompts (manual override entry points)
 
 See [`.github/prompts/PROMPT-GUIDE.md`](.github/prompts/PROMPT-GUIDE.md). The prompts are override entry points — the autonomous builder orchestrates the full pipeline.
@@ -48,7 +57,7 @@ See [`.github/prompts/PROMPT-GUIDE.md`](.github/prompts/PROMPT-GUIDE.md). The pr
 ## Rules
 
 - **Workflow state vocabulary is exact** — `approved` not `accepted`, `pass` not `passed`. Hooks parse field values literally.
-- **Vision lock update rules** — minor updates in place with minor version bump + changelog; scope/goal changes require human approval, propose in CURRENT-STATE `## Proposed Vision Updates` first.
+- **Vision lock update rules** — minor updates in place with minor version bump + changelog; scope/goal changes require human approval, propose in `CURRENT-STATE.md` `## Proposed Vision Updates` first.
 - **Run tests before committing.** Never commit broken tests.
 - **Update docs when code changes affect documented behavior** in the same slice.
 - **Record new design decisions as ADRs.**

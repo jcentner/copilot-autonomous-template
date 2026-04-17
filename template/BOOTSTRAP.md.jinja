@@ -26,12 +26,13 @@ When planner returns:
 
 1. Write `docs/vision/VISION-LOCK.md` (version 1.0.0, include a changelog stub).
 2. Write `roadmap/phases/phase-1-design.md`.
-3. Update `roadmap/CURRENT-STATE.md`:
+3. Update `roadmap/state.md` (machine fields):
    - `Phase: 1`
    - `Phase Title: <from design>`
    - `Design Plan: roadmap/phases/phase-1-design.md`
-   - `Design Status: draft`
-4. Seed `roadmap/README.md` with the phase 1 link.
+   - `Design Status: in-critique`
+4. Update `roadmap/CURRENT-STATE.md` `## Context` with a short summary of the vision and chosen tech stack.
+5. Seed `roadmap/README.md` with the phase 1 link.
 
 ## Step 4 — Catalog selection
 
@@ -41,8 +42,8 @@ Stack skills are **not** created here. The builder creates one skill per adopted
 
 ## Step 5 — Finalize and self-delete
 
-1. Set CURRENT-STATE `Stage: design-critique`.
-2. Append Session Log: `- [ISO8601] bootstrap: vision + phase 1 design drafted, catalog activated (<list>)`.
+1. Set `roadmap/state.md` `Stage: design-critique`, `Blocked Kind: n/a`.
+2. Append to `roadmap/CURRENT-STATE.md` `## Context`: `[ISO8601] bootstrap: vision + phase 1 design drafted, catalog activated (<list>)`.
 3. Save a repo-memory note at `/memories/repo/bootstrap.md` summarizing the vision and tech stack.
 4. Delete this file (`BOOTSTRAP.md`). After this session, it should not exist.
 

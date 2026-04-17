@@ -9,45 +9,43 @@ You are executing one slice of the approved implementation plan for {{ project_n
 
 ## Precondition
 
-1. Read `roadmap/CURRENT-STATE.md`.
+1. Read `roadmap/state.md`.
 2. Verify **Stage** is `executing`. If not, stop and report the current stage.
 3. Note the **Active Slice** number and the **Implementation Plan** path.
 
 ## Input
 
-Slice number (defaults to **Active Slice** from CURRENT-STATE): **${input:sliceNumber}**
+Slice number (defaults to **Active Slice** from state.md): **${input:sliceNumber}**
 
 ## Slice loop
+
+This prompt mirrors the canonical slice loop in `.github/agents/autonomous-builder.agent.md` (section "The slice loop"). If the two ever disagree, the builder agent is authoritative.
 
 Execute every step in order. Do not skip or reorder:
 
 1. **Read the slice** from the implementation plan: files touched, scope, acceptance criteria, test strategy.
 2. **Invoke tester subagent** with the spec. Tester writes tests without reading implementation (hook-enforced).
 3. **Implement the slice** — edit only the files listed in the slice plan. If the slice grows, stop and update the plan first.
-4. **Run tests**. On failure, apply the builder's error recovery: diagnose, fix (up to 2 attempts), otherwise record in `docs/reference/tech-debt.md` and move on.
+4. **Run tests**, then **write the result explicitly** with `python3 .github/hooks/scripts/write-test-evidence.py pass|fail|n/a`. On failure, apply the builder's error recovery: diagnose, fix (up to 2 attempts), otherwise record in `docs/reference/tech-debt.md` and move on.
 5. **Run post-implementation checks** from the implementation plan (stale references, config traces, diagram/prose consistency).
-6. **Invoke reviewer subagent** on changed files. Reviewer writes `Review Verdict` + findings to CURRENT-STATE.
+6. **Invoke reviewer subagent** on the changed files — always, regardless of file count. Reviewer writes `Review Verdict` + findings to state.md.
 7. **Fix all Critical and Major findings** before committing.
 8. **Commit**: `type(scope): description` format, one slice per commit.
-9. **Update Slice Evidence** in CURRENT-STATE:
-   - `Tests Written: yes`
-   - `Tests Pass: yes`
-   - `Reviewer Invoked: yes`
-   - `Review Verdict: <pass|needs-fixes|needs-rework>`
-   - `Critical Findings: N`
-   - `Major Findings: N`
-   - `Committed: yes`
+9. **Advance state (single atomic update)** in state.md:
+   - Set `Reviewer Invoked: yes`, `Review Verdict: <pass|needs-fixes|needs-rework>`, `Critical Findings: N`, `Major Findings: N`, `Committed: yes`.
    - Increment `Active Slice`.
+   - Reset slice evidence for the next slice: `Tests Written: pending`, `Tests Pass: pending`, `Reviewer Invoked: pending`, `Review Verdict: pending`, `Critical Findings: 0`, `Major Findings: 0`, `Committed: pending`.
+   - On the next slice, rerun `write-test-evidence.py` as soon as you have a result. That helper stamps `Evidence For Slice` to the current `Active Slice`; `session-gate` blocks stop while `Evidence For Slice != Active Slice` — the hook-enforced backstop on the manual reset above.
 
 The Stop hook (`session-gate.py`) blocks session end if Slice Evidence is incomplete during `executing`.
 
 ## Autopilot behavior
 
-Under autopilot, do **not** ask clarifying questions. Make evidence-based decisions, log the rationale to Session Log, and record architectural choices as ADRs. Stage-gate and tool-guardrails hooks remain hard constraints.
+Under autopilot, do **not** ask clarifying questions. Make evidence-based decisions, append rationale to `## Context` in `CURRENT-STATE.md`, and record architectural choices as ADRs. Stage-gate and tool-guardrails hooks remain hard constraints.
 
 ## Do not
 
 - Edit files outside the slice's declared scope.
 - Commit broken tests.
-- Skip the reviewer on slices touching 3+ files.
+- Skip the reviewer. Every slice gets a reviewer pass, regardless of file count.
 - Advance `Active Slice` before committing.

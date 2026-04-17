@@ -42,9 +42,21 @@ class StageGateTests(unittest.TestCase):
         payload = self._payload("bootstrap", "create_file", file_path="src/foo.py")
         self.assertEqual(self._decision(payload), "allow")
 
-    def test_cleanup_stage_allows_anything(self):
+    def test_cleanup_stage_denies_source_edit(self):
+        # cleanup is NOT a source-writing stage; only executing and bootstrap are.
         payload = self._payload("cleanup", "create_file", file_path="src/foo.py")
+        self.assertEqual(self._decision(payload), "deny")
+
+    def test_cleanup_stage_allows_doc_edit(self):
+        payload = self._payload(
+            "cleanup", "create_file", file_path="docs/reference/x.md"
+        )
         self.assertEqual(self._decision(payload), "allow")
+
+    def test_unknown_stage_denies(self):
+        # Unknown Stage values must fail closed, not fall through to allow.
+        payload = self._payload("bogus", "create_file", file_path="src/foo.py")
+        self.assertEqual(self._decision(payload), "deny")
 
     def test_terminal_command_always_allowed(self):
         make_state(self.tmp, stage="planning")
@@ -111,6 +123,31 @@ class StageGateTests(unittest.TestCase):
             replacements=[{"filePath": "src/foo.py"}],
         )
         self.assertEqual(self._decision(payload), "deny")
+
+    def test_multi_replace_mixed_bypass_denied(self):
+        # Bug A regression: an allow-listed first entry must NOT let a
+        # source-tree second entry through. Hook must inspect every replacement.
+        payload = self._payload(
+            "planning",
+            "multi_replace_string_in_file",
+            replacements=[
+                {"filePath": "roadmap/CURRENT-STATE.md"},
+                {"filePath": "src/hacked.py"},
+            ],
+        )
+        self.assertEqual(self._decision(payload), "deny")
+
+    def test_multi_replace_all_allowlisted_allowed(self):
+        payload = self._payload(
+            "planning",
+            "multi_replace_string_in_file",
+            replacements=[
+                {"filePath": "roadmap/CURRENT-STATE.md"},
+                {"filePath": "docs/architecture/overview.md"},
+                {"filePath": ".github/prompts/foo.prompt.md"},
+            ],
+        )
+        self.assertEqual(self._decision(payload), "allow")
 
     def test_path_traversal_denied(self):
         payload = self._payload(
