@@ -6,6 +6,33 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-04-17
+
+Backward-compatible additions on top of v1.0.0.
+
+### Added
+- **`write-commit-evidence.py`** — agent-invoked CLI helper that stamps
+  `Committed` after `git commit`. Refuses to mark `Committed: yes` when
+  the working tree is dirty (ignoring `roadmap/sessions/`,
+  `roadmap/state.md`, and `__pycache__/`), preventing the field from
+  becoming a lie. Required step in the autonomous-builder and
+  `/implement` per-slice loop.
+- **Product-owner `n/a — <reason>` opt-out** — phases with no
+  user-facing surface (refactors, infra, build/CI, internal tooling)
+  may declare `n/a — <≥20-char justification>` in the User Stories
+  section. `subagent-verdict-check` accepts this as terminal; bare
+  `n/a` or trivial reasons are still rejected.
+- **Template-aware review skill and prompt** for the meta-repo
+  (`copilot-autonomous-template` itself).
+
+### Fixed
+- **Bootstrap stage-flip ordering**, and `BOOTSTRAP.md` is now in the
+  bootstrap-stage allowlist.
+- **`subagent-verdict-check` story scoping** — the `As a ...` check now
+  runs against the User Stories section body only, not the entire plan
+  text, so a story phrase elsewhere in the doc no longer satisfies the
+  gate.
+
 ## [1.0.0] — 2026-04-17
 
 First tagged release. The template is restructured around a hook-verified
@@ -49,16 +76,6 @@ for the design rationale (ADRs 001–010).
   promoted from catalog to core.
 - **`write-test-evidence.py`** — agent-invoked CLI helper that stamps
   `Tests Written`, `Tests Pass`, and `Evidence For Slice` atomically.
-- **`write-commit-evidence.py`** — agent-invoked CLI helper that stamps
-  `Committed` after `git commit`. Refuses to mark `Committed: yes` when
-  the working tree is dirty (ignoring `roadmap/sessions/`,
-  `roadmap/state.md`, and `__pycache__/`), preventing the field from
-  becoming a lie.
-- **Product-owner `n/a — <reason>` opt-out** — phases with no
-  user-facing surface (refactors, infra, build/CI, internal tooling)
-  may declare `n/a — <≥20-char justification>` in the User Stories
-  section. `subagent-verdict-check` accepts this as terminal; bare
-  `n/a` or trivial reasons are still rejected.
 - **Core agents** — `critic` and `product-owner` promoted from catalog
   to core with SubagentStop verification. `tester` agent gains a
   PreToolUse isolation hook. `planner` gains a SubagentStop check.
