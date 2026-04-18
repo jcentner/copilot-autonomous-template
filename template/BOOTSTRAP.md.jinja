@@ -42,9 +42,12 @@ Stack skills are **not** created here. The builder creates one skill per adopted
 
 ## Step 5 — Finalize and self-delete
 
-1. Set `roadmap/state.md` `Stage: design-critique`, `Blocked Kind: n/a`.
-2. Append to `roadmap/CURRENT-STATE.md` `## Context`: `[ISO8601] bootstrap: vision + phase 1 design drafted, catalog activated (<list>)`.
-3. Save a repo-memory note at `/memories/repo/bootstrap.md` summarizing the vision and tech stack.
-4. Delete this file (`BOOTSTRAP.md`). After this session, it should not exist.
+Order matters here. The Stop hook diffs the working tree against `HEAD` and refuses to let the session end if non-allowlisted files have changed for the current Stage. If you flip Stage out of `bootstrap` while the tree is still dirty, the gate will block. Do these in order:
+
+1. Append to `roadmap/CURRENT-STATE.md` `## Context`: `[ISO8601] bootstrap: vision + phase 1 design drafted, catalog activated (<list>)`.
+2. Save a repo-memory note at `/memories/repo/bootstrap.md` summarizing the vision and tech stack.
+3. Delete this file (`BOOTSTRAP.md`). After this session, it should not exist.
+4. `git add -A && git commit -m "bootstrap: vision, phase 1 design, catalog activation"` so the working tree is clean.
+5. **Last:** set `roadmap/state.md` `Stage: design-critique`, `Blocked Kind: n/a`, then commit that single state.md change. The Stage flip must be the final mutation, on a clean tree.
 
 The next session resumes from `Stage: design-critique` — the critic will review the phase 1 design.

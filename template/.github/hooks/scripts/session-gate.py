@@ -35,6 +35,13 @@ from _state_io import (
 
 ALLOWLISTED_PREFIXES = ("roadmap/", "docs/", ".github/")
 
+# Specific root-level files that are legitimately mutated outside the
+# prefix allowlist. `BOOTSTRAP.md` is created by the template and deleted
+# by the bootstrap stage itself; its deletion may still appear in
+# `git diff HEAD` after Stage advances if the bootstrap commit lands
+# in the same session as the Stage flip.
+ALLOWLISTED_PATHS = frozenset({"BOOTSTRAP.md"})
+
 NON_EXECUTING_STAGES = {
     "planning",
     "design-critique",
@@ -87,7 +94,10 @@ def git_diff_source_changes(cwd):
         return []
     changed = [p.strip() for p in result.stdout.splitlines() if p.strip()]
     return [
-        p for p in changed if not any(p.startswith(pref) for pref in ALLOWLISTED_PREFIXES)
+        p
+        for p in changed
+        if not any(p.startswith(pref) for pref in ALLOWLISTED_PREFIXES)
+        and p not in ALLOWLISTED_PATHS
     ]
 
 
