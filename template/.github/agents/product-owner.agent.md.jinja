@@ -65,7 +65,15 @@ Format:
 - [explicit exclusion]
 ```
 
-At least one story is required. Acceptance criteria must be specific enough that a tester could write passing tests from them without access to the implementation.
+At least one story is required **unless** the phase legitimately has no user-facing surface (refactor, build/CI, infra, internal tooling, dev-loop scaffolding). For those cases, write the section as:
+
+```markdown
+## User Stories
+
+n/a — <one-sentence justification, e.g. "phase replaces the build pipeline; no user-observable behavior changes.">
+```
+
+The justification must be at least 20 characters. The hook accepts this as terminal. Do **not** use `n/a` to skip authoring stories for genuine user-facing work — be honest about which case applies. Acceptance criteria must still be specific enough that a tester could write passing tests from them without access to the implementation.
 
 ### Rules for design mode
 

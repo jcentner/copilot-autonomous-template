@@ -203,12 +203,32 @@ def check_product_owner(fields, cwd):
         if "## User Stories" not in plan_text:
             return (
                 f"product-owner (design): design plan '{design_plan}' has no "
-                f"`## User Stories` section. Add at least one story before returning."
+                f"`## User Stories` section. Add at least one story, or declare "
+                f"`n/a \u2014 <reason>` if the phase has no user-facing surface."
             )
-        if not re.search(r"\*\*As a\*\*|^-\s+As a\b", plan_text, re.MULTILINE | re.IGNORECASE):
+        # Extract the User Stories section body (until next `## ` heading or EOF).
+        section_match = re.search(
+            r"^##\s+User Stories\s*$(.*?)(?=^##\s+|\Z)",
+            plan_text,
+            re.MULTILINE | re.DOTALL | re.IGNORECASE,
+        )
+        section_body = section_match.group(1) if section_match else ""
+        # Allow an explicit n/a declaration with a non-trivial reason. The
+        # reason guards against drive-by `n/a` with no justification — phases
+        # like refactors, infra, build/CI, or single-developer tooling are
+        # legitimate uses; vacuous opt-outs are not.
+        na_match = re.search(
+            r"^\s*[*_-]*\s*(?:n/?a|not\s+applicable)\b\s*[\u2014\-:]+\s*(.+?)\s*$",
+            section_body,
+            re.MULTILINE | re.IGNORECASE,
+        )
+        if na_match and len(na_match.group(1).strip()) >= 20:
+            return None
+        if not re.search(r"\*\*As a\*\*|^-\s+As a\b", section_body, re.MULTILINE | re.IGNORECASE):
             return (
                 f"product-owner (design): design plan '{design_plan}' has a User "
-                f"Stories section but no story body ('As a ... I want to ...')."
+                f"Stories section but no story body ('As a ... I want to ...') "
+                f"and no `n/a \u2014 <reason of \u226520 chars>` declaration."
             )
         return None
     return None

@@ -176,6 +176,70 @@ class ProductOwnerVerdictTests(unittest.TestCase):
         )
         self.assertFalse(is_block(out))
 
+    def test_design_mode_na_with_reason_allows(self):
+        # Phases with no user-facing surface (refactors, infra, build/CI)
+        # may legitimately declare `n/a — <reason>` in the User Stories
+        # section. The hook accepts this as terminal.
+        make_state(self.tmp, stage="design-critique", design_status="in-critique")
+        self._write_design_plan(
+            textwrap.dedent(
+                """\
+                # Phase 1 Design
+
+                ## User Stories
+
+                n/a — phase replaces the internal build pipeline; no
+                user-observable behavior changes.
+
+                ## Acceptance Criteria
+
+                - Build succeeds on CI.
+                """
+            )
+        )
+        rc, out, _ = run_verdict_hook(
+            "product-owner", {"cwd": str(self.tmp)}, self.tmp
+        )
+        self.assertFalse(is_block(out))
+
+    def test_design_mode_na_short_reason_blocks(self):
+        # Drive-by `n/a` with a trivial reason must not pass — the agent
+        # has to commit to a real justification.
+        make_state(self.tmp, stage="design-critique", design_status="in-critique")
+        self._write_design_plan(
+            textwrap.dedent(
+                """\
+                # Phase 1 Design
+
+                ## User Stories
+
+                n/a — skip
+                """
+            )
+        )
+        rc, out, _ = run_verdict_hook(
+            "product-owner", {"cwd": str(self.tmp)}, self.tmp
+        )
+        self.assertTrue(is_block(out))
+
+    def test_design_mode_na_without_reason_blocks(self):
+        make_state(self.tmp, stage="design-critique", design_status="in-critique")
+        self._write_design_plan(
+            textwrap.dedent(
+                """\
+                # Phase 1 Design
+
+                ## User Stories
+
+                n/a
+                """
+            )
+        )
+        rc, out, _ = run_verdict_hook(
+            "product-owner", {"cwd": str(self.tmp)}, self.tmp
+        )
+        self.assertTrue(is_block(out))
+
 
 class ReviewerVerdictTests(unittest.TestCase):
     def setUp(self):
