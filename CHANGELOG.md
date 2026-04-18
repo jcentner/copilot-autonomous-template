@@ -49,6 +49,16 @@ for the design rationale (ADRs 001–010).
   promoted from catalog to core.
 - **`write-test-evidence.py`** — agent-invoked CLI helper that stamps
   `Tests Written`, `Tests Pass`, and `Evidence For Slice` atomically.
+- **`write-commit-evidence.py`** — agent-invoked CLI helper that stamps
+  `Committed` after `git commit`. Refuses to mark `Committed: yes` when
+  the working tree is dirty (ignoring `roadmap/sessions/`,
+  `roadmap/state.md`, and `__pycache__/`), preventing the field from
+  becoming a lie.
+- **Product-owner `n/a — <reason>` opt-out** — phases with no
+  user-facing surface (refactors, infra, build/CI, internal tooling)
+  may declare `n/a — <≥20-char justification>` in the User Stories
+  section. `subagent-verdict-check` accepts this as terminal; bare
+  `n/a` or trivial reasons are still rejected.
 - **Core agents** — `critic` and `product-owner` promoted from catalog
   to core with SubagentStop verification. `tester` agent gains a
   PreToolUse isolation hook. `planner` gains a SubagentStop check.

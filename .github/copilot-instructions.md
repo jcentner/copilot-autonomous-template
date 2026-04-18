@@ -33,6 +33,7 @@ template/                           # Everything under here gets copied to the t
         evidence-tracker.py         # PostToolUse: per-session activity log
         context-pressure.py         # PostToolUse: context-window advisory
         write-test-evidence.py      # Agent helper: stamps Tests Pass + Evidence For Slice
+        write-commit-evidence.py    # Agent helper: stamps Committed (refuses on dirty tree)
     prompts/
       PROMPT-GUIDE.md.jinja         # Human-facing usage guide
       design-plan.prompt.md.jinja

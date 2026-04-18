@@ -35,9 +35,11 @@ Concretely:
 
 1. **State writes** are performed by:
    - Agents (via prompts that explicitly instruct field updates).
-   - The hook-internal helper `write-test-evidence.py` (an agent-invoked
-     CLI utility, not a hook), which the agent runs after deciding the
-     test result is final.
+   - The agent-invoked CLI helpers `write-test-evidence.py` (stamps
+     `Tests Written` / `Tests Pass` / `Evidence For Slice` after the
+     agent decides the test result is final) and `write-commit-evidence.py`
+     (stamps `Committed` after `git commit`; refuses on a dirty working
+     tree so the field cannot lie).
    - `_state_io.update_state_field()`, called from agent helper scripts.
 
 2. **State verification** is performed by hooks:

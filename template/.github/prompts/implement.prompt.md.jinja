@@ -30,9 +30,9 @@ Execute every step in order. Do not skip or reorder:
 5. **Run post-implementation checks** from the implementation plan (stale references, config traces, diagram/prose consistency).
 6. **Invoke reviewer subagent** on the changed files — always, regardless of file count. Reviewer writes `Review Verdict` + findings to state.md.
 7. **Fix all Critical and Major findings** before committing.
-8. **Commit**: `type(scope): description` format, one slice per commit.
+8. **Commit**: `type(scope): description` format, one slice per commit. Then stamp commit evidence: `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty.
 9. **Advance state (single atomic update)** in state.md:
-   - Set `Reviewer Invoked: yes`, `Review Verdict: <pass|needs-fixes|needs-rework>`, `Critical Findings: N`, `Major Findings: N`, `Committed: yes`.
+   - Set `Reviewer Invoked: yes`, `Review Verdict: <pass|needs-fixes|needs-rework>`, `Critical Findings: N`, `Major Findings: N` (the helper wrote `Committed`).
    - Increment `Active Slice`.
    - Reset slice evidence for the next slice: `Tests Written: pending`, `Tests Pass: pending`, `Reviewer Invoked: pending`, `Review Verdict: pending`, `Critical Findings: 0`, `Major Findings: 0`, `Committed: pending`.
    - On the next slice, rerun `write-test-evidence.py` as soon as you have a result. That helper stamps `Evidence For Slice` to the current `Active Slice`; `session-gate` blocks stop while `Evidence For Slice != Active Slice` — the hook-enforced backstop on the manual reset above.

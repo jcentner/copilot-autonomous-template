@@ -41,6 +41,7 @@ required=(
   ".github/hooks/scripts/subagent-verdict-check.py"
   ".github/hooks/scripts/tester-isolation.py"
   ".github/hooks/scripts/write-test-evidence.py"
+  ".github/hooks/scripts/write-commit-evidence.py"
   ".github/agents/autonomous-builder.agent.md"
   ".github/agents/planner.agent.md"
   ".github/agents/reviewer.agent.md"

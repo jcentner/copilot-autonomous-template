@@ -99,8 +99,8 @@ For each slice in the implementation plan:
 4. Run post-implementation checks: stale references grep, config end-to-end trace, diagram/prose consistency.
 5. Invoke **reviewer** on changed files. The reviewer writes Review Verdict + findings to state.md.
 6. Fix all Critical and Major findings.
-7. `git commit` with format `type(scope): description`.
-8. Update remaining Slice Evidence in state.md: `Reviewer Invoked`, `Review Verdict`, `Critical Findings`, `Major Findings`, `Committed`. Increment `Active Slice` and **reset slice evidence fields** to `pending` (Tests Written, Tests Pass, Reviewer Invoked, Review Verdict, Critical Findings = 0, Major Findings = 0, Committed) so the next slice starts with a clean slate.
+7. `git commit` with format `type(scope): description`, then **stamp commit evidence** with `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty — do not bypass it by editing state.md directly.
+8. Update remaining Slice Evidence in state.md: `Reviewer Invoked`, `Review Verdict`, `Critical Findings`, `Major Findings` (the helper above wrote `Committed`). Increment `Active Slice` and **reset slice evidence fields** to `pending` (Tests Written, Tests Pass, Reviewer Invoked, Review Verdict, Critical Findings = 0, Major Findings = 0, Committed) so the next slice starts with a clean slate.
 
 The Stop hook (`session-gate.py`) blocks session end if Slice Evidence is incomplete during `executing`.
 
@@ -153,6 +153,8 @@ Runs under **autopilot** (local) or **Copilot CLI** (background, worktree-isolat
 
 - One slice = one commit. Format: `type(scope): description`.
 - Commit after each successful slice, not at session end.
+- In non-`executing` stages (planning, design/implementation critique, reviewing), commit accumulated plan and doc work between stage transitions and before stopping. This is **soft guidance, not hook-enforced** — the next session can recover uncommitted work, but a clean tree at stage boundaries makes resumption and review much easier.
+- Stamp commit evidence with `write-commit-evidence.py yes` after every commit during `executing`. The helper verifies the working tree is clean (ignoring the rolling session log, `state.md`, and `__pycache__/`) before stamping; this prevents `Committed: yes` from being a lie.
 - Never `git push --force` (tool-guardrails denies); use `--force-with-lease` if absolutely necessary.
 
 ## End of session
