@@ -27,6 +27,7 @@ Core (shipped by default):
 | `product-owner` | User stories (design mode) / strategic review (review mode). SubagentStop-verified. |
 | `reviewer` | Code review + security + docs-sync. SubagentStop-verified verdict. |
 | `tester` | Writes tests from spec without reading implementation. Isolation hook-enforced. |
+| `researcher` | Web research + comparative analysis. Produces durable `docs/reference/<topic>.md` from cited public sources. NO terminal access (anti-injection). Verified caller-side, not by hook (see ADR-010). |
 
 Catalog (activated on demand at bootstrap):
 

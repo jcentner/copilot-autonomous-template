@@ -64,14 +64,14 @@ For each issue, write:
 #### [Short title]
 - **Type**: Assumption / Edge Case / Scope Risk / Feasibility / Testing Gap / Acceptance Gap
 - **Severity**: Blocking / Major / Minor
-- **Evidence-Status**: present | needed | unmeasurable
+- **evidence-status**: present | needed | unmeasurable
 - **Affects**: [section or slice]
 - **Issue**: [what's wrong]
-- **Evidence**: [cite code/docs/reasoning, OR — when Evidence-Status: needed — describe the audit/measurement the planner must run before re-critique]
+- **Evidence**: [cite code/docs/reasoning, OR — when evidence-status: needed — describe the audit/measurement the planner must run before re-critique]
 - **Recommendation**: [specific change]
 ```
 
-`Evidence-Status` semantics (consult [evidence-gathering skill](../skills/evidence-gathering/SKILL.md) before writing):
+`evidence-status` semantics (consult [evidence-gathering skill](../skills/evidence-gathering/SKILL.md) before writing):
 
 - **present** — you cite a file, a fetched URL, a measured metric, or a deterministic snippet. Default for normal findings.
 - **needed** — the finding rests on a claim that can be checked but you have not checked it (live API audit, schema dump, file-inventory grep, dependency-version probe). The planner is responsible for running the check before the next round.
@@ -97,7 +97,7 @@ VERDICT: rethink
 - `revise` — significant issues; planner must revise within round budget.
 - `rethink` — fundamental problems; approach likely wrong.
 
-**You may not issue `approve` while any finding is tagged `Evidence-Status: needed`.** Open evidence is not approval-eligible — return `revise` and list the audits the planner must run. The `evidence-gathering` skill walks through the audit patterns.
+**You may not issue `approve` while any finding is tagged `evidence-status: needed`.** Open evidence is not approval-eligible — return `revise` and list the audits the planner must run. The `evidence-gathering` skill walks through the audit patterns.
 
 If you believe the round budget (3 design / 2 implementation) is exhausted and a human must decide, still emit `revise` (or `rethink`) and note the escalation in your findings; `record-verdict.py` will refuse the over-cap increment and the orchestrator will route to a human gate.
 

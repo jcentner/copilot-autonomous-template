@@ -18,9 +18,6 @@ hooks:
   PostToolUse:
     - type: command
       command: "python3 .github/hooks/scripts/evidence-tracker.py"
-  SubagentStop:
-    - type: command
-      command: "python3 .github/hooks/scripts/subagent-verdict-check.py researcher"
 handoffs:
   - label: Hand back to builder
     agent: agent
@@ -115,7 +112,7 @@ Update `roadmap/state.md`:
 - Append the reference doc path to the `## Context` section in `roadmap/CURRENT-STATE.md` as `[ISO8601] researcher: <topic> — docs/reference/<topic>.md`.
 - (You do **not** mutate Stage, Phase, or critique counters — those belong to the orchestrator.)
 
-The SubagentStop hook (`subagent-verdict-check.py researcher`) verifies the reference doc was actually written.
+**No automated SubagentStop verification.** Per ADR-010 (three-tier honesty), the orchestrator cannot reliably verify *which* `docs/reference/<topic>.md` corresponds to *this* invocation without per-call topic state, and a presence-only check would be honesty theatre. Verification is therefore **caller-side**: the orchestrator reads your handoff message (which includes the reference doc path) and confirms the file exists before proceeding. If you return without writing the doc, the orchestrator must catch it.
 
 ## Process
 

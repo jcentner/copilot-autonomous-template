@@ -283,7 +283,7 @@ out=$(echo '{"cwd":"'"$TMP"'","tool_name":"read_file","tool_input":{"filePath":"
 echo "$out" | python3 -c "import json,sys;d=json.load(sys.stdin);assert d['hookSpecificOutput']['permissionDecision']=='allow',d"
 
 echo "==> critic agent: VERDICT trailer + evidence-gathering skill cross-reference"
-for token in "VERDICT: approve" "VERDICT: revise" "VERDICT: rethink" "Evidence-Status" "evidence-gathering" "record-verdict.py"; do
+for token in "VERDICT: approve" "VERDICT: revise" "VERDICT: rethink" "evidence-status" "evidence-gathering" "record-verdict.py"; do
   if ! grep -q "$token" "$TMP/.github/agents/critic.agent.md"; then
     echo "FAIL: critic.agent.md missing token: $token" >&2
     exit 1
@@ -313,7 +313,7 @@ for token in "MANIFEST" "Activation only" "never overwrite" "deactivation"; do
 done
 
 echo "==> evidence-gathering skill: required audit patterns referenced"
-for token in "Evidence-Status" "Live API audit" "researcher"; do
+for token in "evidence-status" "Live API audit" "researcher"; do
   if ! grep -q "$token" "$TMP/.github/skills/evidence-gathering/SKILL.md"; then
     echo "FAIL: evidence-gathering/SKILL.md missing token: $token" >&2
     exit 1

@@ -1,22 +1,22 @@
 ---
 name: evidence-gathering
-description: "Patterns for gathering empirical evidence to satisfy `Evidence-Status: needed` findings from the critic agent. USE FOR: planner responding to a critic verdict that flagged needed evidence; pre-emptively grounding design-plan claims; researcher gathering external grounding for a strategize candidate. DO NOT USE FOR: findings tagged `unmeasurable` (judgment / taste / future-fit) — argue on merits, do not invent measurements."
+description: "Patterns for gathering empirical evidence to satisfy `evidence-status: needed` findings from the critic agent. USE FOR: planner responding to a critic verdict that flagged needed evidence; pre-emptively grounding design-plan claims; researcher gathering external grounding for a strategize candidate. DO NOT USE FOR: findings tagged `unmeasurable` (judgment / taste / future-fit) — argue on merits, do not invent measurements."
 ---
 
 # Evidence Gathering
 
-The [critic](../../agents/critic.agent.md) tags each finding with `Evidence-Status: present | needed | unmeasurable`. A `needed` tag means: **the claim is checkable, but no one has checked it yet.** This skill describes the audit patterns the planner runs **before** the next critique round, so the next round can see real evidence instead of conjecture.
+The [critic](../../agents/critic.agent.md) tags each finding with `evidence-status: present | needed | unmeasurable`. A `needed` tag means: **the claim is checkable, but no one has checked it yet.** This skill describes the audit patterns the planner runs **before** the next critique round, so the next round can see real evidence instead of conjecture.
 
 ## When to use
 
-- You are the planner (or autonomous-builder) responding to a critic verdict of `revise` whose findings include any `Evidence-Status: needed` items.
+- You are the planner (or autonomous-builder) responding to a critic verdict of `revise` whose findings include any `evidence-status: needed` items.
 - You are writing a design plan and want to pre-empt `needed` findings by grounding claims now.
 - You are the researcher gathering external grounding for a strategize candidate.
 
 ## When NOT to use
 
-- The finding is `Evidence-Status: unmeasurable` (judgment, taste, future fit). Argue on merits; do not invent measurements.
-- The finding is `Evidence-Status: present` and you disagree with the cited evidence. Re-read the citation; if still in disagreement, write a counter-finding with your own `Evidence-Status: present` cite.
+- The finding is `evidence-status: unmeasurable` (judgment, taste, future fit). Argue on merits; do not invent measurements.
+- The finding is `evidence-status: present` and you disagree with the cited evidence. Re-read the citation; if still in disagreement, write a counter-finding with your own `evidence-status: present` cite.
 
 ## Audit patterns
 
@@ -78,7 +78,7 @@ When the finding is "this could race":
 - Identify each writer + reader path (cite by file:line).
 - State the ordering guarantee — atomic? lock? optimistic? "no guarantee, accepted because <reason>"?
 
-The output is a written assertion in the plan, not a measurement. Tag it `Evidence-Status: present` only if you've cited every writer/reader path.
+The output is a written assertion in the plan, not a measurement. Tag it `evidence-status: present` only if you've cited every writer/reader path.
 
 ### 5. Performance probe
 
@@ -102,17 +102,17 @@ For any finding involving a third-party system without a `docs/reference/<system
 
 After running the audit(s), update the design or implementation plan:
 
-- For each `Evidence-Status: needed` finding, add a sub-section **"Evidence (gathered <ISO8601>)"** containing the command run, the captured output (truncated to ~20 lines), and a one-sentence interpretation.
-- The next critic round must see the evidence and either accept the rebuttal (re-tag `Evidence-Status: present` in the next critique) or escalate to a `Blocking` finding with concrete reasoning.
+- For each `evidence-status: needed` finding, add a sub-section **"Evidence (gathered <ISO8601>)"** containing the command run, the captured output (truncated to ~20 lines), and a one-sentence interpretation.
+- The next critic round must see the evidence and either accept the rebuttal (re-tag `evidence-status: present` in the next critique) or escalate to a `Blocking` finding with concrete reasoning.
 
 ## Anti-patterns
 
-- **Hand-waving "we'll check later".** That's exactly what `needed` flagged. If you cannot run the check this session, mark the finding `Evidence-Status: deferred` in your reply and explain why — but the critic is allowed to refuse approval until it's resolved.
+- **Hand-waving "we'll check later".** That's exactly what `needed` flagged. If you cannot run the check this session, mark the finding `evidence-status: deferred` in your reply and explain why — but the critic is allowed to refuse approval until it's resolved.
 - **Inventing measurements.** "It's probably ~50ms" is not evidence. If you didn't run the timer, don't cite a number.
 - **Citing the plan to itself.** Evidence comes from outside the plan: code, fetched docs, measured output. Plans citing themselves are circular.
 
 ## Cross-reference
 
-- Critic agent: [`.github/agents/critic.agent.md`](../../agents/critic.agent.md) — produces the `Evidence-Status` tags.
+- Critic agent: [`.github/agents/critic.agent.md`](../../agents/critic.agent.md) — produces the `evidence-status` tags.
 - Researcher agent: [`.github/agents/researcher.agent.md`](../../agents/researcher.agent.md) — for external-system grounding.
 - ADR-011 (strategy stage and three-gate approval) — origin of the evidence-status convention.
