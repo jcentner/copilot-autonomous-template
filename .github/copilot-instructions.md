@@ -129,3 +129,23 @@ grep -r "Test Project" /tmp/test-output                 # should find substitute
 - Don't hardcode project-specific values in `.jinja` files — use template variables.
 - Don't add a `tools` list to agents/prompts unless intentionally restricting capabilities.
 - Don't duplicate instructions across prompts — prompts link to `copilot-instructions.md` for shared context.
+
+## Reviewing changes (mandatory doc-grounding)
+
+This repo's product **is** GitHub Copilot customization. Any review of changes that touch agent / prompt / instruction / skill / hook files must be **grounded in the current Copilot docs**, not memory.
+
+Before approving (or self-approving) any change to files under `template/.github/agents/`, `template/.github/prompts/`, `template/.github/instructions/`, `template/.github/skills/`, `template/.github/hooks/`, `template/.github/copilot-instructions.md.jinja`, or `template/AGENTS.md.jinja`:
+
+1. **Consult the `copilot-customization-docs` skill** ([.github/skills/copilot-customization-docs/](.github/skills/copilot-customization-docs/)) for the relevant primitive (agents, prompts, instructions, hooks, subagents, permissions). The `references/` files there are version-stamped.
+2. **If the skill's reference is older than ~3 months or the change touches a feature not covered, fetch the live doc** from the URLs listed in the skill (e.g., `https://code.visualstudio.com/docs/copilot/customization/custom-agents`). Cite the URL + retrieval date in the review or commit message.
+3. **Validate frontmatter against the docs**, not against memory. Common things to check:
+   - `tools:` values are real built-in tool sets / individual tools / `<server>/*` MCP names — not invented.
+   - `agents:` declared subagents only work if the `agent` tool is included in `tools:` (per the docs verbatim).
+   - Deprecated fields (e.g., `infer`) are not used.
+   - Hook output JSON matches the schema for the hook event (`hookSpecificOutput` shape, `decision` / `permissionDecision` enum values, top-level `systemMessage` only where supported).
+   - `applyTo` globs on `.instructions.md` use the documented syntax.
+   - Stop hooks honor `stop_hook_active` to prevent infinite loops.
+4. **Treat the smoke test as a must-pass, not an aspiration.** Frontmatter-scoped assertions (e.g., the researcher no-terminal check) must scan the YAML block, not the whole file body, because explanatory prose may legitimately mention denied tool names.
+
+If a doc fetch reveals a Copilot feature change that affects shipped templates, add it to `## Proposed Workflow Improvements` in `roadmap/CURRENT-STATE.md` (or open a tech-debt entry) — do not silently retrofit the template without recording the source.
+

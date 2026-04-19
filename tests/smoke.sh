@@ -47,6 +47,7 @@ required=(
   ".github/hooks/scripts/write-test-evidence.py"
   ".github/hooks/scripts/write-commit-evidence.py"
   ".github/hooks/scripts/branch-gate.py"
+  ".github/hooks/scripts/record-verdict.py"
   ".github/hooks/config/branch-policy.json"
   ".github/hooks/config/stage-recommendations.json"
   ".github/agents/autonomous-builder.agent.md"
@@ -67,6 +68,9 @@ required=(
   ".github/prompts/strategize.prompt.md"
   ".github/prompts/research.prompt.md"
   ".github/prompts/merge-phase.prompt.md"
+  ".github/prompts/scrap-phase.prompt.md"
+  ".github/prompts/catalog-review.prompt.md"
+  ".github/skills/evidence-gathering/SKILL.md"
   ".github/hooks/scripts/_state_io.py"
   "docs/wraps/README.md"
   "docs/wraps/TEMPLATE.md"
@@ -277,5 +281,91 @@ echo "==> tester-isolation: read tests → allow"
 out=$(echo '{"cwd":"'"$TMP"'","tool_name":"read_file","tool_input":{"filePath":"tests/test_app.py"}}' \
   | python3 "$TMP/.github/hooks/scripts/tester-isolation.py")
 echo "$out" | python3 -c "import json,sys;d=json.load(sys.stdin);assert d['hookSpecificOutput']['permissionDecision']=='allow',d"
+
+echo "==> critic agent: VERDICT trailer + evidence-gathering skill cross-reference"
+for token in "VERDICT: approve" "VERDICT: revise" "VERDICT: rethink" "Evidence-Status" "evidence-gathering" "record-verdict.py"; do
+  if ! grep -q "$token" "$TMP/.github/agents/critic.agent.md"; then
+    echo "FAIL: critic.agent.md missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> critic agent: must NOT instruct rounds increment (Decision #21)"
+if grep -qiE "increment .*Critique Rounds" "$TMP/.github/agents/critic.agent.md"; then
+  echo "FAIL: critic.agent.md still instructs the critic to increment rounds; record-verdict.py is sole writer" >&2
+  exit 1
+fi
+
+echo "==> scrap-phase prompt: refuses dirty tree, archives, leaves Phase unchanged"
+for token in "Working tree is dirty" "_archived" "Do NOT touch \`Phase\`" "scrapped-by-human"; do
+  if ! grep -q "$token" "$TMP/.github/prompts/scrap-phase.prompt.md"; then
+    echo "FAIL: scrap-phase.prompt.md missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> catalog-review prompt: activation-only, never overwrites, MANIFEST-driven"
+for token in "MANIFEST" "Activation only" "never overwrite" "deactivation"; do
+  if ! grep -qi "$token" "$TMP/.github/prompts/catalog-review.prompt.md"; then
+    echo "FAIL: catalog-review.prompt.md missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> evidence-gathering skill: required audit patterns referenced"
+for token in "Evidence-Status" "Live API audit" "researcher"; do
+  if ! grep -q "$token" "$TMP/.github/skills/evidence-gathering/SKILL.md"; then
+    echo "FAIL: evidence-gathering/SKILL.md missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> stage-recommendations.json: every referenced /prompt resolves to a .prompt.md.jinja in the template source"
+python3 - <<PY
+import json, pathlib, sys
+cfg = json.load(open("$TMP/.github/hooks/config/stage-recommendations.json"))
+prompts_dir = pathlib.Path("$REPO/template/.github/prompts")
+available = {p.name.split(".")[0] for p in prompts_dir.glob("*.prompt.md.jinja")}
+missing = []
+for stage, entry in cfg.items():
+    for slash in entry.get("prompts", []):
+        if not slash.startswith("/"):
+            continue
+        name = slash[1:]
+        if name not in available:
+            missing.append(f"{stage} → {slash}")
+if missing:
+    print("FAIL: stage-recommendations references prompts that do not exist:", missing)
+    sys.exit(1)
+PY
+
+echo "==> record-verdict.py: refuses missing trailer (smoke)"
+# Build a minimal scenario: design-critique stage, R1 artifact w/o trailer.
+mkdir -p "$TMP/roadmap/phases"
+cp "$TMP/roadmap/state.md.bak" "$TMP/roadmap/state.md"
+sed -i 's/\*\*Stage\*\*: bootstrap/\*\*Stage\*\*: design-critique/' "$TMP/roadmap/state.md"
+sed -i 's/\*\*Phase\*\*: 0/\*\*Phase\*\*: 1/' "$TMP/roadmap/state.md" || true
+echo "# critique" > "$TMP/roadmap/phases/phase-1-critique-design-R1.md"
+# Suppress ERR trap during the intentional-failure check.
+trap - ERR
+set +e
+(cd "$TMP" && python3 .github/hooks/scripts/record-verdict.py design R1 >/dev/null 2>&1)
+rc=$?
+set -e
+trap 'echo "FAIL at line $LINENO" >&2' ERR
+if [[ $rc -eq 0 ]]; then
+  echo "FAIL: record-verdict.py accepted artifact without VERDICT trailer" >&2
+  exit 1
+fi
+
+echo "==> record-verdict.py: applies design approve mutation (smoke)"
+echo "VERDICT: approve" >> "$TMP/roadmap/phases/phase-1-critique-design-R1.md"
+(cd "$TMP" && python3 .github/hooks/scripts/record-verdict.py design R1 >/dev/null)
+grep -q "\*\*Design Status\*\*: approved" "$TMP/roadmap/state.md" || {
+  echo "FAIL: record-verdict did not set Design Status: approved" >&2; exit 1; }
+grep -q "\*\*Blocked Kind\*\*: awaiting-design-approval" "$TMP/roadmap/state.md" || {
+  echo "FAIL: record-verdict did not set Blocked Kind: awaiting-design-approval" >&2; exit 1; }
+grep -q "\*\*Next Prompt\*\*: /resume" "$TMP/roadmap/state.md" || {
+  echo "FAIL: record-verdict did not set Next Prompt: /resume" >&2; exit 1; }
 
 echo "ALL SMOKE CHECKS PASSED"

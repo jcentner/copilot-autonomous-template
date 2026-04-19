@@ -1,0 +1,81 @@
+---
+description: "Abandon the current phase. Archives phase artifacts, resets Phase-scoped state fields to neutral, leaves Phase number unchanged so the next strategize pick reuses it. Refuses on a dirty working tree."
+agent: agent
+---
+
+# Scrap Phase
+
+Abandon the current phase before merge. The phase number is **burned** — the next `/strategize` pick reuses the same `Phase: N` (Phase 1 scrapped → next pick is Phase 1 again, not Phase 2). This differs from `/resume` post-merge, where the merged phase increments `Phase`.
+
+## Precondition
+
+1. Read [`roadmap/state.md`](../../roadmap/state.md). Refuse if `Stage: bootstrap` (use the bootstrap flow instead) or `Stage: complete` (vision is done; nothing to scrap).
+2. **Working tree must be clean.** Run `git diff HEAD` (or `git status --porcelain`). If anything is dirty, refuse with the exact message:
+
+   > Working tree is dirty. Commit or stash your changes before scrapping — scrapped phases archive their artifacts, but uncommitted source edits would be orphaned.
+   > Override path (discouraged): re-invoke `/scrap-phase --force`. Forced scraps still archive artifacts; uncommitted edits remain in the working tree and become your problem.
+
+3. Read `Phase` (the number being scrapped) and `Phase Title`. Confirm the scrap intent with `vscode_askQuestions`:
+
+   - Options: "**Yes — scrap phase N (<title>)**" / "**Cancel**".
+   - Description should remind: "phase number stays at N; next strategize reuses it; artifacts archived under `roadmap/phases/_archived/`."
+
+   On Cancel: stop without changes.
+
+## Archive artifacts
+
+1. Compute timestamp `T = ISO8601 (UTC, lex-sortable: YYYYMMDDTHHMMSSZ)`.
+2. Create `roadmap/phases/_archived/phase-N-<T>-scrapped/`.
+3. Move (not copy) every `roadmap/phases/phase-N-*.md` file into that directory. This includes the design plan, implementation plan, all `phase-N-critique-*-R*.md` artifacts, and all `phase-N-review-slice-*.md` artifacts.
+4. If no `phase-N-*.md` files exist (e.g., scrapping immediately after `/strategize` set the title but before any plan was written), still create the archive directory but write a marker file `EMPTY.md` containing `Scrapped before any phase artifacts were written; only state.md was reset.`
+
+## Reset state fields
+
+Update [`state.md`](../../roadmap/state.md). **Do NOT touch `Phase`.** Reset the following to neutral:
+
+- `Phase Title: Strategy Pending`
+- `Design Plan: n/a`
+- `Design Status: n/a`
+- `Design Critique Rounds: 0`
+- `Implementation Plan: n/a`
+- `Implementation Status: n/a`
+- `Implementation Critique Rounds: 0`
+- `Active Slice: n/a`
+- `Slice Total: n/a`
+- All Slice Evidence fields (`Evidence For Slice`, `Tests Written`, `Tests Pass`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings: 0`, `Major Findings: 0`, `Strategic Review`, `Committed`) → `n/a` / `0`
+- `Stage: blocked`
+- `Blocked Kind: scrapped-by-human`
+- `Blocked Reason: "Phase N scrapped at <T>; archived to roadmap/phases/_archived/phase-N-<T>-scrapped/."`
+- `Next Prompt: /strategize`
+
+## Branch cleanup (announce only)
+
+If a phase branch matching `^phase/N-` exists locally, **print** suggested cleanup commands but **do not execute them**:
+
+```bash
+# If the branch is local-only (no upstream):
+git checkout main
+git branch -D phase/N-<theme>
+```
+
+If the branch tracks a remote (`git rev-parse --abbrev-ref --symbolic-full-name @{u}` succeeds), refuse to suggest deletion:
+
+> Branch `phase/N-<theme>` is on origin. The agent will not suggest deleting a published branch. Decide manually whether to keep it as a record of the scrapped attempt.
+
+## Append narrative
+
+Append to `## Context` in [`CURRENT-STATE.md`](../../roadmap/CURRENT-STATE.md):
+
+```
+[ISO8601] /scrap-phase: phase N (<title>) scrapped — <reason from human, captured in vscode_askQuestions follow-up if any>; artifacts at roadmap/phases/_archived/phase-N-<T>-scrapped/.
+```
+
+Then stop. The next session runs `/resume` (which clears `Blocked Kind: scrapped-by-human` and routes to `/strategize`).
+
+## Rules
+
+- **Phase number is burned, not incremented.** Do not change `Phase`.
+- **No git operations beyond read-only checks.** Do not run `git checkout`, `git branch -D`, or any push. Print commands; the human runs them.
+- **Refuse, do not auto-fix.** If working tree dirty, refuse — do not stash silently.
+- **Archive everything; delete nothing.** Use `git mv` if you want the move tracked; otherwise plain filesystem move is acceptable since scrapped artifacts are kept under `_archived/`.
+- **Do not deactivate catalog items, edit ADRs, or alter the vision.** Scrap is about the in-flight phase only.

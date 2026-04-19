@@ -38,27 +38,48 @@ class CriticVerdictTests(unittest.TestCase):
     def tearDown(self):
         self._tmp.cleanup()
 
-    def test_design_critique_non_terminal_blocks(self):
+    def _write_critique(self, kind, round_no, body):
+        return make_phase_artifact(
+            self.tmp, f"phase-1-critique-{kind}-R{round_no}.md", body=body
+        )
+
+    def test_design_critique_missing_artifact_blocks(self):
+        # Per Block 3 / Decision #21, critic does NOT write status anymore.
+        # The hook now only checks artifact + VERDICT trailer presence.
         make_state(self.tmp, stage="design-critique", design_status="in-critique")
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertEqual(rc, 0)
         self.assertTrue(is_block(out))
 
-    def test_design_critique_approved_allows(self):
-        make_state(self.tmp, stage="design-critique", design_status="approved")
-        make_phase_artifact(self.tmp, "phase-1-critique-design-R1.md")
+    def test_design_critique_artifact_with_approve_trailer_allows(self):
+        make_state(self.tmp, stage="design-critique", design_status="in-critique")
+        self._write_critique("design", 1, "# critique\n\nVERDICT: approve\n")
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertFalse(is_block(out))
 
-    def test_design_critique_revise_allows(self):
-        make_state(self.tmp, stage="design-critique", design_status="revise")
-        make_phase_artifact(self.tmp, "phase-1-critique-design-R1.md")
+    def test_design_critique_artifact_with_revise_trailer_allows(self):
+        make_state(self.tmp, stage="design-critique", design_status="in-critique")
+        self._write_critique("design", 1, "# critique\n\nVERDICT: revise\n")
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertFalse(is_block(out))
 
-    def test_design_critique_missing_artifact_blocks(self):
-        # Terminal status set but critic didn't write the round file.
-        make_state(self.tmp, stage="design-critique", design_status="approved")
+    def test_design_critique_artifact_missing_trailer_blocks(self):
+        make_state(self.tmp, stage="design-critique", design_status="in-critique")
+        self._write_critique("design", 1, "# critique\n\nNo trailer here.\n")
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_design_critique_lowercase_trailer_blocks(self):
+        make_state(self.tmp, stage="design-critique", design_status="in-critique")
+        self._write_critique("design", 1, "# critique\n\nverdict: approve\n")
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertTrue(is_block(out))
+
+    def test_design_critique_multiple_trailers_blocks(self):
+        make_state(self.tmp, stage="design-critique", design_status="in-critique")
+        self._write_critique(
+            "design", 1, "VERDICT: approve\n\nVERDICT: revise\n"
+        )
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertTrue(is_block(out))
 
@@ -66,27 +87,29 @@ class CriticVerdictTests(unittest.TestCase):
         make_state(
             self.tmp,
             stage="implementation-critique",
-            implementation_status="approved",
+            implementation_status="in-critique",
         )
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertTrue(is_block(out))
 
-    def test_implementation_critique_with_artifact_allows(self):
-        make_state(
-            self.tmp,
-            stage="implementation-critique",
-            implementation_status="approved",
-        )
-        make_phase_artifact(self.tmp, "phase-1-critique-implementation-R1.md")
-        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
-        self.assertFalse(is_block(out))
-
-    def test_implementation_critique_non_terminal_blocks(self):
+    def test_implementation_critique_with_trailer_allows(self):
         make_state(
             self.tmp,
             stage="implementation-critique",
             implementation_status="in-critique",
         )
+        self._write_critique(
+            "implementation", 1, "# critique\n\nVERDICT: approve\n"
+        )
+        rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
+        self.assertFalse(is_block(out))
+
+    def test_critic_uses_highest_round_artifact(self):
+        # When R1 and R2 both exist, the hook validates R2 (latest).
+        make_state(self.tmp, stage="design-critique", design_status="revise")
+        self._write_critique("design", 1, "VERDICT: approve\n")
+        # R2 has no trailer → should block even though R1 is fine.
+        self._write_critique("design", 2, "# critique\n\n(no trailer)\n")
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertTrue(is_block(out))
 

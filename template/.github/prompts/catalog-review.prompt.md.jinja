@@ -1,0 +1,65 @@
+---
+description: "Re-present the workflow catalog so the human can activate additional dormant capabilities (agents, prompts, hooks, skills, patterns). Activation only — never deactivates."
+agent: agent
+---
+
+# Catalog Review
+
+Re-run the catalog picker mid-flight to activate additional dormant capabilities. The autonomous-builder surfaces this prompt automatically when `/strategize` flags a candidate touching an unactivated catalog item; humans can also invoke it manually.
+
+## Precondition
+
+1. Read [`.github/catalog/MANIFEST.md`](../catalog/MANIFEST.md) — the machine-readable index of every catalog item with its `path` (relative to `.github/catalog/`) and target install path under `.github/`.
+2. Read the current [`roadmap/state.md`](../../roadmap/state.md) `Stage`. Refuse if `Stage: bootstrap` (catalog selection happens in `BOOTSTRAP.md` itself, not here).
+3. Build the **already-activated** set by listing existing files under `.github/agents/`, `.github/prompts/`, `.github/hooks/`, `.github/skills/`, and `.github/instructions/` and matching them against MANIFEST entries.
+
+## Phase A — Present the picker
+
+Use `vscode_askQuestions` with one option per **non-activated** MANIFEST entry, grouped by type. For each entry show:
+
+- **Name** — e.g., `agents/security-reviewer`
+- **Description** — from MANIFEST
+- **Recommended (if any)** — mark items that the calling context (e.g., `/strategize` recommendation) flagged
+
+Add an "**Activate nothing — close this prompt**" option as the last choice.
+
+`multiSelect: true` so the human can activate several at once.
+
+## Phase B — Copy selected items
+
+For each picked entry:
+
+1. Resolve source = `.github/catalog/<entry path>` and target = `.github/<destination path under target tree>` (per MANIFEST).
+2. **If the target already exists, skip with a warning.** Do not overwrite — overwriting could clobber project-local edits.
+3. Otherwise copy the file (preserving directory structure for skills like `.github/skills/<name>/SKILL.md`).
+4. If the entry is a Jinja template (`.jinja` suffix in catalog), the catalog stores it pre-rendered — copy as-is. Activation is verbatim; the template's variables were resolved at the original `copier copy` time.
+
+## Phase C — Announce, don't deactivate
+
+After copying:
+
+- Print the list of newly-activated items with their target paths.
+- Append to `## Context` in [`CURRENT-STATE.md`](../../roadmap/CURRENT-STATE.md):
+
+  ```
+  [ISO8601] /catalog-review: activated <comma-separated list>; deactivations not performed automatically.
+  ```
+
+- **Do NOT remove or rename any existing files.** If the human wants to deactivate something, they delete it manually and run `git commit`. The agent does not delete enforcement-layer files (per `tool-guardrails.py` and operational safety).
+
+## State updates
+
+`/catalog-review` is **state-neutral** with one exception: if it was invoked from a `Blocked Kind: awaiting-strategy-approval` session and the human chose to activate items, leave the block in place — the original strategize escape is still pending. The human resumes via `/resume` (or re-runs `/strategize` directly) when ready.
+
+In all other cases:
+
+- Leave `Stage`, `Phase`, `Phase Title`, `Next Prompt` untouched.
+- The user remains where they were before invoking this prompt.
+
+## Rules
+
+- **Activation only — never deactivation.** Removal of files is a human-only action.
+- **Never overwrite an existing file.** If a target exists, skip + warn. The user can `rm` and re-run if they truly want a fresh copy from catalog.
+- **Do not invent catalog entries.** Use MANIFEST.md as the source of truth. If MANIFEST is out of date, write the discrepancy to `## Proposed Workflow Improvements` in `CURRENT-STATE.md`.
+- **Do not edit `.github/catalog/`.** The catalog is the storehouse; activation copies out of it, never into it.
+- **Researcher is core, not catalog (v1.2+).** Do not surface a `researcher` activation option even if it appears in MANIFEST — `MANIFEST.md` should already exclude it.

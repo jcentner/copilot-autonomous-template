@@ -64,11 +64,18 @@ For each issue, write:
 #### [Short title]
 - **Type**: Assumption / Edge Case / Scope Risk / Feasibility / Testing Gap / Acceptance Gap
 - **Severity**: Blocking / Major / Minor
+- **Evidence-Status**: present | needed | unmeasurable
 - **Affects**: [section or slice]
 - **Issue**: [what's wrong]
-- **Evidence**: [cite code/docs/reasoning]
+- **Evidence**: [cite code/docs/reasoning, OR — when Evidence-Status: needed — describe the audit/measurement the planner must run before re-critique]
 - **Recommendation**: [specific change]
 ```
+
+`Evidence-Status` semantics (consult [evidence-gathering skill](../skills/evidence-gathering/SKILL.md) before writing):
+
+- **present** — you cite a file, a fetched URL, a measured metric, or a deterministic snippet. Default for normal findings.
+- **needed** — the finding rests on a claim that can be checked but you have not checked it (live API audit, schema dump, file-inventory grep, dependency-version probe). The planner is responsible for running the check before the next round.
+- **unmeasurable** — claim cannot be empirically verified (judgment about user need, future fit, taste). Use sparingly; over-use erodes critic credibility.
 
 ## Output artifact
 
@@ -76,29 +83,31 @@ Write findings to a new file at:
 
 - `roadmap/phases/phase-N-critique-{design|implementation}-R{round}.md` where N = current Phase and round = current `Design Critique Rounds` or `Implementation Critique Rounds` **before** this round plus 1.
 
-The file must end with a `## Verdict` section containing **one** of:
+The file **must end** with a single trailer line on its own (no leading whitespace, no surrounding markup) matching exactly:
 
-- `Verdict: approve` — plan is sound; minor notes only. → write `approved` to the state field.
-- `Verdict: revise` — significant issues; planner must revise within round budget. → write `revise`.
-- `Verdict: rethink` — fundamental problems; approach likely wrong. → write `rethink`.
-- `Verdict: escalate` — round budget exhausted; human must decide. → write `waived` to the state field **and** set `Blocked Reason` to summarize the escalation; the builder will transition Stage to `blocked`.
+```
+VERDICT: approve
+VERDICT: revise
+VERDICT: rethink
+```
 
-The artifact verdict is the human-readable word; the CURRENT-STATE field uses the past-tense / canonical value above. They differ intentionally — do not paraphrase either side.
+(case-sensitive, no trailing punctuation). Pick one:
 
-## State updates (required before you return)
+- `approve` — plan is sound; minor notes only.
+- `revise` — significant issues; planner must revise within round budget.
+- `rethink` — fundamental problems; approach likely wrong.
 
-You **must** update `roadmap/state.md` before returning. The SubagentStop hook verifies this — if you return without updating, you will be sent back.
+**You may not issue `approve` while any finding is tagged `Evidence-Status: needed`.** Open evidence is not approval-eligible — return `revise` and list the audits the planner must run. The `evidence-gathering` skill walks through the audit patterns.
 
-- If stage is `design-critique`:
-  - Increment `Design Critique Rounds` by 1.
-  - Set `Design Status` to the verdict: `approved` | `revise` | `rethink` | `waived` (humans only) — never leave it as `in-critique` or `draft`.
-- If stage is `implementation-critique`:
-  - Increment `Implementation Critique Rounds` by 1.
-  - Set `Implementation Status` to the verdict (same values).
+If you believe the round budget (3 design / 2 implementation) is exhausted and a human must decide, still emit `revise` (or `rethink`) and note the escalation in your findings; `record-verdict.py` will refuse the over-cap increment and the orchestrator will route to a human gate.
 
-(Per-tool-call activity is auto-logged. The verdict artifact file you wrote, plus the updated state.md fields, are the record of this round.)
+## Do NOT write state.md
 
-Use exact field vocabulary — do not paraphrase values.
+The critic does not touch `roadmap/state.md`. After you return, the orchestrator runs `python3 .github/hooks/scripts/record-verdict.py {design|impl} R<n>`, which is the **sole writer** of `Design Status` / `Implementation Status` / `Design Critique Rounds` / `Implementation Critique Rounds` / `Stage` / `Blocked Kind` / `Next Prompt` for this transition. If you write any of those fields yourself, `record-verdict.py` will see stale or doubled values and refuse.
+
+The SubagentStop hook (`subagent-verdict-check.py critic`) verifies your artifact exists and contains a parseable `VERDICT:` trailer; it does not verify state.md fields for the critic role. Per-tool activity is auto-logged.
+
+Use exact verdict vocabulary — do not paraphrase.
 
 ## Rules
 

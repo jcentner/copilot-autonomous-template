@@ -106,66 +106,78 @@ def _phase_for_artifact(fields, stage, role):
     return phase, None
 
 
+# Critic verdict trailer — strict, single line, exact match. Aligned with
+# record-verdict.py VERDICT_RE so an artifact that passes this hook also
+# parses cleanly downstream.
+_VERDICT_TRAILER_RE = re.compile(
+    r"^VERDICT: (approve|revise|rethink)\s*$", re.MULTILINE
+)
+
+
+def _latest_critique_round(cwd, phase, kind):
+    """Return the highest R{n} artifact path + n for kind in
+    {'design','implementation'}, or (None, 0) if none exist.
+    """
+    phases_dir = os.path.join(cwd, "roadmap", "phases")
+    if not os.path.isdir(phases_dir):
+        return None, 0
+    pattern = re.compile(
+        rf"^phase-{phase}-critique-{kind}-R(\d+)\.md$"
+    )
+    best = (0, None)
+    for name in os.listdir(phases_dir):
+        m = pattern.match(name)
+        if m:
+            n = int(m.group(1))
+            if n > best[0]:
+                best = (n, os.path.join(phases_dir, name))
+    return best[1], best[0]
+
+
 def check_critic(fields, cwd):
+    """Verify critic produced an artifact with a parseable VERDICT trailer.
+
+    Per ADR-011 / Decision #21, the critic MUST NOT write state.md fields;
+    `record-verdict.py` is the sole writer. The SubagentStop check therefore
+    only validates artifact presence + trailer well-formedness — it does
+    not look at Design Status / Implementation Status / rounds counters
+    (those are stale-by-design at the moment the critic returns).
+    """
     stage = get(fields, "stage")
+    if stage not in ("design-critique", "implementation-critique"):
+        return None
+    kind = "design" if stage == "design-critique" else "implementation"
     phase, err = _phase_for_artifact(fields, stage, "critic")
     if err:
         return err
-    if stage == "design-critique":
-        status = get(fields, "design status")
-        if status in NON_TERMINAL_STATUS:
-            return (
-                f"critic: Design Status is '{status}' — must be set to a terminal "
-                f"value ({', '.join(sorted(TERMINAL_STATUS))}) in "
-                f"roadmap/state.md before returning."
-            )
-        try:
-            rounds = int(get(fields, "design critique rounds", "0") or "0")
-        except ValueError:
-            rounds = 0
-        if rounds < 1:
-            return (
-                "critic: Design Critique Rounds must be incremented (>= 1) before "
-                "returning."
-            )
-        artifact = os.path.join(
-            cwd, "roadmap", "phases", f"phase-{phase}-critique-design-R{rounds}.md"
+    artifact, round_no = _latest_critique_round(cwd, phase, kind)
+    if artifact is None:
+        return (
+            f"critic: no critique artifact found at "
+            f"roadmap/phases/phase-{phase}-critique-{kind}-R*.md. "
+            f"Write the critique file for this round before returning."
         )
-        if not os.path.exists(artifact):
-            return (
-                f"critic: expected artifact '{os.path.relpath(artifact, cwd)}' is "
-                f"missing. The critique file for the current round must exist on "
-                f"disk before returning."
-            )
-        return None
-    if stage == "implementation-critique":
-        status = get(fields, "implementation status")
-        if status in NON_TERMINAL_STATUS:
-            return (
-                f"critic: Implementation Status is '{status}' — must be set to a "
-                f"terminal value ({', '.join(sorted(TERMINAL_STATUS))}) before "
-                f"returning."
-            )
-        try:
-            rounds = int(get(fields, "implementation critique rounds", "0") or "0")
-        except ValueError:
-            rounds = 0
-        if rounds < 1:
-            return (
-                "critic: Implementation Critique Rounds must be incremented (>= 1) "
-                "before returning."
-            )
-        artifact = os.path.join(
-            cwd, "roadmap", "phases",
-            f"phase-{phase}-critique-implementation-R{rounds}.md",
+    try:
+        with open(artifact, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return (
+            f"critic: cannot read artifact "
+            f"'{os.path.relpath(artifact, cwd)}'."
         )
-        if not os.path.exists(artifact):
-            return (
-                f"critic: expected artifact '{os.path.relpath(artifact, cwd)}' is "
-                f"missing. The critique file for the current round must exist on "
-                f"disk before returning."
-            )
-        return None
+    matches = _VERDICT_TRAILER_RE.findall(text)
+    if not matches:
+        return (
+            f"critic: artifact '{os.path.relpath(artifact, cwd)}' is "
+            f"missing the verdict trailer. Add a single line matching "
+            f"'^VERDICT: (approve|revise|rethink)$' (case-sensitive) at "
+            f"the end of the file."
+        )
+    if len(matches) > 1:
+        return (
+            f"critic: artifact '{os.path.relpath(artifact, cwd)}' contains "
+            f"{len(matches)} VERDICT lines; exactly one is required."
+        )
     return None
 
 
