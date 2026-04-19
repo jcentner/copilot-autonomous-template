@@ -9,7 +9,9 @@ Available capabilities that can be activated by the autonomous builder or manual
 
 ## Agents
 
-> **Note:** `critic` and `product-owner` were promoted to **core agents** (shipped by default in `.github/agents/`). They are no longer catalog items — activation is automatic.
+> **Note:** `critic` and `product-owner` were promoted to **core agents** in v1.1 (shipped by default in `.github/agents/`). They are no longer catalog items — activation is automatic.
+>
+> **v1.2 update:** `researcher` is now a **core agent** as well (shipped by default). It is intentionally NOT listed in this catalog. `/catalog-review` skips any `researcher` entry it encounters in this file.
 
 ### designer
 

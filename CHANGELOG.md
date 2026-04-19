@@ -6,6 +6,124 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-04-19
+
+Additive on top of v1.1.0. No breaking changes; all v1.1 state.md fields and
+stage values remain valid. See
+[ADR-011](docs/architecture/decisions/011-strategy-stage-and-three-gate-approval.md)
+for the design rationale.
+
+### Added — Block 1 (foundation)
+- **`strategy` stage** between `bootstrap` and `planning` (and as the loop-back
+  target from `cleanup`). New `Blocked Kind` values:
+  `awaiting-strategy-approval`, `awaiting-merge-approval`,
+  `scrapped-by-human`. Vocab updated in `_state_io.VALID_STAGES` /
+  `VALID_BLOCKED_KINDS` and in `state.md.jinja`.
+- **`Next Prompt` machine field** in `state.md`, written by every Stage
+  transition. Surfaced by `session-gate.py` (Stop hook, top-level
+  `systemMessage` per Copilot hooks docs) on every session end.
+- **`Merge Mode` machine field** (`cli` | `pr`). Picked at bootstrap via
+  `vscode_askQuestions` with no pre-selection. `/merge-phase` refuses to
+  run while it is `n/a`.
+- **`branch-gate.py`** (PreToolUse) — refuses `git commit` on denylisted
+  branches (default: `main`, `master`, `trunk`, `prod`, `release/*`).
+  Bootstrap exempt. Config at `.github/hooks/config/branch-policy.json`.
+- **`stage-recommendations.json`** — per-stage prompts/skills surfaced by
+  the Stop hook so `Next Prompt` is never opaque. Smoke test asserts every
+  referenced `/prompt` resolves to a real `.prompt.md.jinja`.
+- **`stage-gate.STAGE_PATH_DENYLIST`** — `strategy` stage cannot write to
+  `roadmap/phases/`.
+- **BOOTSTRAP.md** rewritten: no `phase-1-design.md`; new Step 3.5 detects
+  external systems (greps package manifests for `*-client`/`*-sdk`/`-api`
+  deps) so `/strategize` can recommend `/research`. New Step 4 asks Merge
+  Mode. Final stage flip is `Stage: strategy`, not `design-critique`.
+- **`/resume`** extended with three new Blocked-Kind branches:
+  `awaiting-strategy-approval`, `awaiting-merge-approval` (this branch
+  increments `Phase` and resets all Phase-scoped fields after merge
+  verification), `scrapped-by-human`.
+
+### Added — Block 2 (researcher + strategize + merge)
+- **`researcher` core agent** at `.github/agents/researcher.agent.md` —
+  produces `docs/reference/<topic>.md` from cited public sources. **NO
+  terminal access** — closes prompt-injection-via-fetched-content →
+  shell-execution attack surface. Verified caller-side per
+  [ADR-010](docs/architecture/decisions/010-three-tier-enforcement-honesty.md);
+  no SubagentStop hook (a presence-only check would be enforcement
+  theatre).
+- **`/strategize`** prompt — reads vision + open questions + tech debt +
+  recent context; produces ≥3 ranked candidates including at least one
+  outside `docs/plans/`; presents via `vscode_askQuestions` with a "save
+  and let me think" escape; writes a timestamped artifact at
+  `roadmap/strategy-YYYYMMDD-HHMMSSZ.md` (lex-sortable).
+- **`/research <topic>`** prompt — standalone dispatcher to the researcher
+  subagent.
+- **`/merge-phase`** prompt — branches on `Merge Mode`. Verifies tests +
+  reviewer + doc-sync + clean tree; prints commands or PR URL; sets
+  `Blocked Kind: awaiting-merge-approval`. Agent never executes the
+  merge.
+- **Reviewer agent extended** with `doc-sync: missing` finding tag —
+  warning per-slice (does not fail review verdict); blocker at
+  `/merge-phase` (refuses until cleared).
+
+### Added — Block 3 (verdict / scrap / evidence / catalog-review)
+- **`record-verdict.py`** — sole writer of `Design Critique Rounds` /
+  `Implementation Critique Rounds` and the verdict-driven mutations.
+  Parses `^VERDICT: (approve|revise|rethink)$` trailer (case-sensitive,
+  exact). Refuses missing / ambiguous / lowercase trailers and
+  out-of-order or over-cap rounds (caps 3 design / 2 impl per
+  [ADR-004](docs/architecture/decisions/004-stage-pipeline-and-critique-loops.md)).
+  Asymmetric mutations: `design approve` → `awaiting-design-approval`
+  human gate; `impl approve` → `executing` directly.
+- **`/scrap-phase`** prompt — refuses on dirty tree (override:
+  `--force`); archives `roadmap/phases/phase-N-*` to
+  `roadmap/phases/_archived/phase-N-<ISO>-scrapped/`; resets all
+  Phase-scoped fields; **leaves `Phase` unchanged** (the burned number
+  is reused by the next strategize pick); refuses to suggest deleting
+  any phase branch that exists on `origin`.
+- **`/catalog-review`** prompt — re-presents the catalog picker; copies
+  selected items from `.github/catalog/<type>/` to `.github/<type>/`;
+  skips already-activated items; **never overwrites; never
+  deactivates** (alignment with operational safety).
+- **`evidence-gathering` skill** at
+  `.github/skills/evidence-gathering/SKILL.md` — audit patterns for
+  satisfying `evidence-status: needed` critic findings (live API audit,
+  schema dump, file/dependency inventory, race-condition audit,
+  performance probe, external-system grounding via researcher).
+- **Critic agent updated** to (a) mandate the `^VERDICT:` trailer; (b)
+  tag every finding with `evidence-status: present | needed |
+  unmeasurable`; (c) refuse `approve` while any `needed` finding is
+  open; (d) NOT write `state.md` — `record-verdict.py` is sole writer
+  per Decision #21.
+- **`subagent-verdict-check.py` critic check rewritten** — verifies
+  artifact presence + parseable VERDICT trailer only. Old
+  state-field/rounds checks removed (those fields are stale-by-design
+  at the moment the critic returns).
+
+### Changed
+- **Autonomous-builder dispatch table** — new `strategy` row; new
+  `awaiting-strategy-approval` and `awaiting-merge-approval` Blocked
+  Kinds; explicit `Next Prompt` for every transition; `cleanup` no
+  longer loops to `planning` — it sets `awaiting-merge-approval`.
+  Researcher and `branch-gate.py` registered.
+- **AGENTS.md core-agents table** — researcher row added.
+- **Catalog MANIFEST preamble** — notes that researcher is core in v1.2+.
+
+### Migration notes
+- Existing in-flight v1.1 projects continue working. State.md vocab
+  additions don't invalidate existing values.
+- After `copier update`:
+  - `Merge Mode` defaults to `n/a` and must be set manually (or by the
+    next strategize → merge cycle's `/merge-phase` prompt, which will
+    refuse with a clear message until set).
+  - Run `/catalog-review` to inspect the picker; researcher is now core,
+    not catalog, so it will already be present.
+  - The new `branch-gate.py` denylists `main`, `master`, `trunk`, `prod`
+    — projects on trunk-based development must edit
+    `.github/hooks/config/branch-policy.json` to remove `main` from the
+    denylist.
+  - `/merge-phase` only supports GitHub for v1.2 (CLI or PR via `gh` /
+    compare URL). GitLab / Bitbucket are v1.3+ candidates.
+
 ## [1.1.0] — 2026-04-17
 
 Backward-compatible additions on top of v1.0.0.

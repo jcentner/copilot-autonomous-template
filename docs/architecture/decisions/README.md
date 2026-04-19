@@ -22,6 +22,7 @@ the v1 redesign (April 2026).
 | [008](008-promote-critic-product-owner-to-core.md) | Promote critic and product-owner from catalog to core agents | Accepted |
 | [009](009-bootstrap-carve-out-and-protected-state.md) | Bootstrap carve-out and `state.md` write-protection | Accepted |
 | [010](010-three-tier-enforcement-honesty.md) | Three-tier enforcement vocabulary (deterministic / strongly-guided / advisory) | Accepted |
+| [011](011-strategy-stage-and-three-gate-approval.md) | Strategy stage + three hook-enforced human-approval gates; researcher promoted to core; `record-verdict.py` as sole writer of critique-rounds | Accepted |
 
 ## Conventions
 
