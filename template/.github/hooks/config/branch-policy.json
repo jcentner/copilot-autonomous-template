@@ -1,0 +1,7 @@
+{
+  "denylist": ["main", "master", "trunk", "prod"],
+  "denylist_patterns": ["^release/"],
+  "allowlist_patterns": ["^phase/", "^strategy/", "^wip/", "^bootstrap/"],
+  "bootstrap_exempt": true,
+  "block_message": "Direct commits to '{branch}' are denied. Create a feature branch (phase/N-theme, strategy/YYYY-MM-DD, or wip/<name>) and commit there. Edit .github/hooks/config/branch-policy.json to change the denylist."
+}

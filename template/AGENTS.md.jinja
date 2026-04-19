@@ -37,19 +37,26 @@ Catalog (activated on demand at bootstrap):
 
 ## Stage pipeline
 
-`bootstrap → planning → design-critique → (blocked, Blocked Kind=awaiting-design-approval) → implementation-planning → implementation-critique → executing → reviewing → cleanup → planning`
+`bootstrap → strategy → planning → design-critique → (blocked, Blocked Kind=awaiting-design-approval) → implementation-planning → implementation-critique → executing → reviewing → cleanup → (blocked, Blocked Kind=awaiting-merge-approval) → strategy (loop)`
 
-The `blocked` step on this line is a **scheduled** interruption for design approval — not a generic error state. `Blocked Kind` distinguishes the cause:
+The `blocked` steps on this line are **scheduled** interruptions for human approval — not generic error states. `Blocked Kind` distinguishes the cause:
 
-- `awaiting-design-approval` — this scheduled approval gate.
+- `awaiting-strategy-approval` — strategize was escaped via "save and let me think"; `/resume` re-presents candidates.
+- `awaiting-design-approval` — scheduled design-approval gate.
+- `awaiting-merge-approval` — cleanup finished; `/merge-phase` ran; waiting for human to merge.
 - `awaiting-vision-update` — phase-complete proposed a vision change.
 - `awaiting-human-decision` — a non-design decision surfaced.
+- `scrapped-by-human` — transient; cleared on next strategize session.
 - `error` — irrecoverable runtime failure (out-of-band; not part of the normal flow).
 - `vision-exhausted` — all roadmap phases completed; next step is `/vision-expand`.
 
-After any `blocked` session, run `/resume` to route on `Blocked Kind`. The session-gate hook refuses to allow a session to stop with `Stage: blocked` unless `Blocked Kind` is one of the values above — “blocked with no reason” is not a valid exit.
+After any `blocked` session, run `/resume` to route on `Blocked Kind`. The session-gate hook refuses to allow a session to stop with `Stage: blocked` unless `Blocked Kind` is one of the values above — “blocked with no reason” is not a valid exit. The Stop hook also surfaces the `Next Prompt` field on every stop, so you don't need to remember which slash-command comes next.
 
-The single hard human gate under autopilot is **design plan approval**, enforced by the builder transitioning to `Stage: blocked` with `Blocked Kind: awaiting-design-approval`.
+Three hard human gates under autopilot: **strategy approval** (when escaped), **design plan approval**, and **merge approval**. All hook-enforced via `Stage: blocked` + specific `Blocked Kind` values.
+
+## When to use the autonomous builder
+
+The `autonomous-builder` agent is for **major feature work** that goes through the full pipeline above. For **typos, docs-only edits, one-line bug fixes, and hot-fixes**, use plain Copilot Agent mode (no agent picker). This split is doc-only — no hook enforces it — but the strategy + critique rounds are overhead you don't need for trivial changes.
 ## Prompts (manual override entry points)
 
 See [`.github/prompts/PROMPT-GUIDE.md`](.github/prompts/PROMPT-GUIDE.md). The prompts are override entry points — the autonomous builder orchestrates the full pipeline.
@@ -57,6 +64,7 @@ See [`.github/prompts/PROMPT-GUIDE.md`](.github/prompts/PROMPT-GUIDE.md). The pr
 ## Rules
 
 - **Workflow state vocabulary is exact** — `approved` not `accepted`, `pass` not `passed`. Hooks parse field values literally.
+- **`Next Prompt` field** in `state.md` records the next slash-command to run. Updated by every Stage transition; surfaced by the Stop hook on every session end. If you add a new transition, update `Next Prompt`.
 - **Vision lock update rules** — minor updates in place with minor version bump + changelog; scope/goal changes require human approval, propose in `CURRENT-STATE.md` `## Proposed Vision Updates` first.
 - **Run tests before committing.** Never commit broken tests.
 - **Update docs when code changes affect documented behavior** in the same slice.

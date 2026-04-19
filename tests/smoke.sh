@@ -24,7 +24,11 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 echo "==> copier copy into $TMP"
-"$COPIER" copy "$REPO" "$TMP" --defaults --force \
+# --vcs-ref=HEAD makes copier respect git tracking so newly-added (staged or
+# committed) files are included while untracked files are skipped. Without
+# this, copier excludes everything not in HEAD, which makes local development
+# of new template files painful.
+"$COPIER" copy "$REPO" "$TMP" --defaults --force --vcs-ref=HEAD \
   -d project_name="Smoke" \
   -d description="smoke test" \
   -d language="Python" \
@@ -42,6 +46,9 @@ required=(
   ".github/hooks/scripts/tester-isolation.py"
   ".github/hooks/scripts/write-test-evidence.py"
   ".github/hooks/scripts/write-commit-evidence.py"
+  ".github/hooks/scripts/branch-gate.py"
+  ".github/hooks/config/branch-policy.json"
+  ".github/hooks/config/stage-recommendations.json"
   ".github/agents/autonomous-builder.agent.md"
   ".github/agents/planner.agent.md"
   ".github/agents/reviewer.agent.md"
@@ -83,12 +90,40 @@ if [[ -f "$TMP/.github/prompts/phase-plan.prompt.md" ]]; then
 fi
 
 echo "==> verifying state.md has machine-readable fields"
-for field in "**Stage**" "**Phase**" "**Blocked Kind**" "**Source Root**" "**Test Path Globs**" "**Config File Globs**" "**Tests Pass**" "**Review Verdict**" "**Evidence For Slice**"; do
+for field in "**Stage**" "**Phase**" "**Blocked Kind**" "**Source Root**" "**Test Path Globs**" "**Config File Globs**" "**Tests Pass**" "**Review Verdict**" "**Evidence For Slice**" "**Next Prompt**" "**Merge Mode**"; do
   if ! grep -q "$field" "$TMP/roadmap/state.md"; then
     echo "MISSING field in state.md: $field" >&2
     exit 1
   fi
 done
+
+echo "==> verifying state.md vocab comment lists v1.2 stages and blocked kinds"
+for token in "strategy" "awaiting-strategy-approval" "awaiting-merge-approval" "scrapped-by-human"; do
+  if ! grep -q "$token" "$TMP/roadmap/state.md"; then
+    echo "MISSING vocab token in state.md: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> verifying BOOTSTRAP.md does NOT pre-design phase 1"
+if grep -q "phase-1-design" "$TMP/BOOTSTRAP.md"; then
+  echo "FAIL: BOOTSTRAP.md still references phase-1-design (should be deferred to /strategize)" >&2
+  exit 1
+fi
+if ! grep -q "Stage: strategy" "$TMP/BOOTSTRAP.md"; then
+  echo "FAIL: BOOTSTRAP.md should set Stage: strategy as final flip" >&2
+  exit 1
+fi
+
+echo "==> verifying autonomous-builder agent registers researcher + branch-gate hook"
+if ! grep -q "researcher" "$TMP/.github/agents/autonomous-builder.agent.md"; then
+  echo "FAIL: researcher not in autonomous-builder agents list" >&2
+  exit 1
+fi
+if ! grep -q "branch-gate.py" "$TMP/.github/agents/autonomous-builder.agent.md"; then
+  echo "FAIL: branch-gate.py not in autonomous-builder hooks" >&2
+  exit 1
+fi
 
 echo "==> stage-gate: bootstrap stage → allow"
 out=$(echo '{"cwd":"'"$TMP"'","tool_name":"create_file","tool_input":{"filePath":"src/x.py"}}' \

@@ -156,6 +156,39 @@ class StageGateTests(unittest.TestCase):
         # Normalized path escapes allowlist → deny.
         self.assertEqual(self._decision(payload), "deny")
 
+    # --- v1.2: strategy stage allowances. ---
+
+    def test_strategy_stage_allows_strategy_artifact_write(self):
+        payload = self._payload(
+            "strategy",
+            "create_file",
+            file_path="roadmap/strategy-20260419-120000.md",
+        )
+        self.assertEqual(self._decision(payload), "allow")
+
+    def test_strategy_stage_allows_docs_reference_write(self):
+        payload = self._payload(
+            "strategy",
+            "create_file",
+            file_path="docs/reference/some-system.md",
+        )
+        self.assertEqual(self._decision(payload), "allow")
+
+    def test_strategy_stage_blocks_phase_artifact_write(self):
+        # roadmap/phases/ is reserved for `planning`; strategy may not write it.
+        payload = self._payload(
+            "strategy",
+            "create_file",
+            file_path="roadmap/phases/phase-1-design.md",
+        )
+        self.assertEqual(self._decision(payload), "deny")
+
+    def test_strategy_stage_blocks_source_edit(self):
+        payload = self._payload(
+            "strategy", "create_file", file_path="src/foo.py"
+        )
+        self.assertEqual(self._decision(payload), "deny")
+
 
 if __name__ == "__main__":
     unittest.main()

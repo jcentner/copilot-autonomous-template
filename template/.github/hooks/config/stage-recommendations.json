@@ -1,0 +1,13 @@
+{
+  "bootstrap":               {"prompts": [],                                "skills": ["template-conventions"]},
+  "strategy":                {"prompts": ["/research", "/catalog-review"], "skills": ["evidence-gathering", "deep-interview"]},
+  "planning":                {"prompts": ["/design-plan"],                 "skills": ["evidence-gathering"]},
+  "design-critique":         {"prompts": ["/research"],                    "skills": ["evidence-gathering", "anti-slop"]},
+  "implementation-planning": {"prompts": ["/implementation-plan"],         "skills": []},
+  "implementation-critique": {"prompts": [],                               "skills": ["anti-slop"]},
+  "executing":               {"prompts": ["/implement"],                   "skills": []},
+  "reviewing":               {"prompts": ["/code-review"],                 "skills": []},
+  "cleanup":                 {"prompts": ["/phase-complete", "/merge-phase"], "skills": []},
+  "blocked":                 {"prompts": ["/resume", "/scrap-phase"],      "skills": []},
+  "complete":                {"prompts": ["/vision-expand"],               "skills": []}
+}

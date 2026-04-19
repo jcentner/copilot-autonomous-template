@@ -25,10 +25,12 @@ You are working on **{{ project_name }}**, {{ description }}.
 
 `roadmap/state.md` is parsed by hooks. Use the exact field vocabulary — do not paraphrase. Narrative belongs in `roadmap/CURRENT-STATE.md`; per-tool activity is auto-logged to `roadmap/sessions/<session>.md`.
 
-- `Stage` ∈ `bootstrap`, `planning`, `design-critique`, `implementation-planning`, `implementation-critique`, `executing`, `reviewing`, `cleanup`, `blocked`, `complete`.
+- `Stage` ∈ `bootstrap`, `strategy`, `planning`, `design-critique`, `implementation-planning`, `implementation-critique`, `executing`, `reviewing`, `cleanup`, `blocked`, `complete`.
 - `Design Status` / `Implementation Status` terminal values: `approved`, `revise`, `rethink`, `waived`.
 - `Review Verdict` terminal values: `pass`, `needs-fixes`, `needs-rework`, `n/a`.
 - `Strategic Review` terminal values: `pass`, `replan`, `n/a`.
+- `Next Prompt` — the slash-command the human / orchestrator should run next. Written by every Stage transition. Surfaced by the Stop hook on every session end.
+- `Merge Mode` — `cli` (local merge by human) or `pr` (push + open PR). Picked at bootstrap; edit in `state.md` to change.
 
 Writing a non-terminal value into a terminal field (e.g., `Review Verdict: pending`) will be caught by the SubagentStop hook.
 
@@ -41,9 +43,10 @@ Writing a non-terminal value into a terminal field (e.g., `Review Verdict: pendi
 - `stage-gate.py` (PreToolUse) blocks direct `edit` / `create_file` / `multi_replace_string_in_file` tool calls to paths outside the allowlist for non-executing stages. Every entry in a `multi_replace_string_in_file` `replacements` array is checked — the first-allowed/rest-smuggled bypass is closed. Terminal-based source edits (e.g., `echo ... > src/x.py` via `run_in_terminal`) can bypass this per-call. Fails closed on unknown `Stage` values.
 - `session-gate.py` (Stop) is the **backstop** for the terminal bypass: it runs `git diff --name-only HEAD` at session end and blocks `Stop` if source files changed during a non-executing stage. Terminal source edits are detected at session end, not per command. **Caveat**: if the session terminates abnormally (crash, window close, OS kill), `Stop` never fires and terminal-introduced source edits leak. Treat the per-call gate as best-effort and the diff backstop as eventually-consistent. Also fails closed on unknown `Stage`.
 - `tool-guardrails.py` (PreToolUse) blocks known-destructive commands (`git push --force`, `rm -rf` on critical paths, `git reset --hard`, `curl | sh` pipes, writes to `node_modules/`/`.env`) **and** denies any write to the enforcement layer itself: `.github/hooks/scripts/`, `.github/agents/`, `.github/instructions/`, and `.github/copilot-instructions.md` are protected during every stage. Updates to those come from humans via `copier update` or an explicit unblock, never from the autonomous loop. Denylist on the destructive side — novel patterns can slip through.
+- `branch-gate.py` (PreToolUse) refuses `git commit` when HEAD is on a denylisted branch (default: `main`, `master`, `trunk`, `prod`, `release/*`). Bootstrap stage exempt. Config at `.github/hooks/config/branch-policy.json`.
 - `tester-isolation.py` (PreToolUse, tester-scoped) denies `semantic_search`/`codebase` entirely and path-gates reads/searches to test and config file patterns read from `roadmap/state.md`.
 - `subagent-verdict-check.py` (SubagentStop, critic/product-owner/reviewer) verifies that the subagent wrote a terminal value into the appropriate `state.md` field **and** that the expected artifact file exists on disk (critic round file, reviewer slice review file, product-owner design-plan user-stories section). It cannot verify *quality* — only presence.
-- `session-gate.py` (Stop) blocks session end mid-stage. When `Stage: blocked`, it requires `Blocked Kind` to be one of `awaiting-design-approval | awaiting-vision-update | awaiting-human-decision | error | vision-exhausted`. The next session uses `/resume` to route by `Blocked Kind`.
+- `session-gate.py` (Stop) blocks session end mid-stage. When `Stage: blocked`, it requires `Blocked Kind` to be one of `awaiting-design-approval | awaiting-strategy-approval | awaiting-merge-approval | awaiting-vision-update | awaiting-human-decision | scrapped-by-human | error | vision-exhausted`. The next session uses `/resume` to route by `Blocked Kind`. The Stop hook also surfaces `Next Prompt` and stage-recommended skills/prompts on every stop (block AND allow), so you don't have to remember which slash-command comes next.
 - `evidence-tracker.py` (PostToolUse) is a pure logger: it appends tool-call summaries to the per-session log under `roadmap/sessions/` and never mutates `state.md`. Agents write `Tests Pass` themselves via `.github/hooks/scripts/write-test-evidence.py`.
 - `context-pressure.py` (PostToolUse) emits an advisory when context usage is high. Per-session state files are pruned after 7 days.
 
@@ -57,8 +60,10 @@ Code style, commit message format, choice of subagent vs. inline work, error-rec
 
 ## Execution modes
 
-- **Autopilot**: the builder self-approves plan advancement and logs rationale to the per-session log. The single hard human gate is **design plan approval** — always forces a session break via `Stage: blocked` with `Blocked Kind: awaiting-design-approval`. Under autopilot, do not ask clarifying questions; make evidence-based decisions and append rationale to `## Context` in `CURRENT-STATE.md`. Tool-guardrails and stage-gate hooks remain hard constraints.
-- **Manual**: the builder uses `vscode_askQuestions` at checkpoints (design approval, implementation plan approval, phase review). Hooks still apply.
+- **Autonomous builder** — use the `autonomous-builder` agent for **major feature work** that should go through the full strategy → design → implement → review → merge pipeline.
+- **Plain Agent mode (no agent picker)** — use for **typos / docs-only edits / one-line bug fixes / hot-fixes**. The autonomous builder's strategy + critique rounds are overhead you don't need for trivial changes. This split is doc-only — no hook enforces it.
+- **Autopilot**: the builder self-approves implementation plan advancement and logs rationale to the per-session log. **Three** hard human gates: **strategy approval** (when escaped to session-break), **design plan approval** (always), and **merge approval** (always). All three force a session break via `Stage: blocked` + a specific `Blocked Kind`. Recommended autopilot setting: OFF during `strategy` and at merge gates; ON acceptable during `design-critique` through `executing`.
+- **Manual**: the builder uses `vscode_askQuestions` at checkpoints (strategy approval, design approval, implementation plan approval, phase review, merge). Hooks still apply.
 
 The only bootstrap-time override: greenfield bootstrap must interview the human. That is the sole stage where "don't ask clarifying questions" is waived.
 

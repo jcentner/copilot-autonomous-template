@@ -30,5 +30,8 @@ htmlcov/
 # Copier scratch (generated test outputs)
 /tmp-test-output/
 
+# Working scratch (plans, drafts not yet committed)
+/tmp/
+
 # Memory artifacts
 /memories/

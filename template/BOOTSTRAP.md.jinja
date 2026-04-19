@@ -3,7 +3,7 @@
 > **Read this file on your first session. Follow it. Then delete it.**
 > After bootstrap completes, this file should not exist.
 
-You are in a fresh workspace with no vision lock, no phase history, no stack skills. Your job is to seed the foundational artifacts so the state machine can take over.
+You are in a fresh workspace with no vision lock, no phase history, no stack skills. Your job is to seed the foundational artifacts so the state machine can take over — **not** to design the first phase. Phase design happens in the next session, after the human has approved a strategy.
 
 ## Step 1 — Detect project type
 
@@ -16,7 +16,7 @@ Scan for meaningful source code — not the generated scaffolding (`docs/`, `roa
 
 Invoke the **planner** subagent with a prompt like:
 
-> Run deep-interview (greenfield) or codebase-synthesis (existing) for `{{ project_name }}`. Produce a `VISION-LOCK.md` draft and a `phase-1-design.md` draft. Return file paths.
+> Run deep-interview (greenfield) or codebase-synthesis (existing) for `{{ project_name }}`. Produce a `VISION-LOCK.md` draft only — **do not** draft a phase design. Phase selection is deferred to the strategize step. Return the file path.
 
 Greenfield bootstrap **overrides** the autopilot "don't ask clarifying questions" rule — human input is required here and only here.
 
@@ -25,29 +25,58 @@ Greenfield bootstrap **overrides** the autopilot "don't ask clarifying questions
 When planner returns:
 
 1. Write `docs/vision/VISION-LOCK.md` (version 1.0.0, include a changelog stub).
-2. Write `roadmap/phases/phase-1-design.md`.
-3. Update `roadmap/state.md` (machine fields):
-   - `Phase: 1`
-   - `Phase Title: <from design>`
-   - `Design Plan: roadmap/phases/phase-1-design.md`
-   - `Design Status: in-critique`
-4. Update `roadmap/CURRENT-STATE.md` `## Context` with a short summary of the vision and chosen tech stack.
-5. Seed `roadmap/README.md` with the phase 1 link.
+2. Update `roadmap/state.md` (machine fields):
+   - `Phase: 0`
+   - `Phase Title: Strategy Pending`
+   - `Stage: bootstrap` (will flip in Step 6)
+   - `Next Prompt: /strategize`
+   - Leave all design / implementation / slice fields at their bootstrap defaults (`n/a`).
+3. Update `roadmap/CURRENT-STATE.md` `## Context` with a short summary of the vision and chosen tech stack.
+4. Seed `roadmap/README.md` (no phase link yet — that comes after strategy).
 
-## Step 4 — Catalog selection
+## Step 3.5 — Detect external systems (existing repos only)
+
+Greenfield workspaces skip this step.
+
+For existing repos, surface external dependencies the strategize prompt may want to research:
+
+1. Grep package manifests (`package.json`, `pyproject.toml`, `requirements*.txt`, `Gemfile`, `go.mod`, `Cargo.toml`) for dependencies whose names match `*-client`, `*-sdk`, `*-api`, or known service prefixes (`aws-`, `azure-`, `google-cloud-`, `stripe-`, `twilio-`, `openai`, `anthropic`).
+2. Grep source for hostname patterns matching common public APIs: `*.googleapis.com`, `*.amazonaws.com`, `api.*.com`, `*.openai.com`, `*.anthropic.com`, etc.
+3. If any found, append one line to `roadmap/CURRENT-STATE.md` `## Context`:
+   `[ISO8601] bootstrap: detected external systems — <comma-separated list>`
+4. The strategize prompt reads this line and surfaces `/research <system>` recommendations for any system without an existing `docs/reference/` doc or stack skill.
+
+## Step 4 — Pick merge mode
+
+Use `vscode_askQuestions` to ask the human which merge mode this repo uses. Show **no** pre-selection — the human must consciously pick:
+
+> How do you merge phase branches into the trunk?
+>
+> - **`cli`** — local merge, you run `git merge --no-ff && git push` yourself.
+> - **`pr`** — push the branch and open a PR (GitHub today; GitLab/Bitbucket later).
+
+Write the answer to `roadmap/state.md`:
+
+- `Merge Mode: cli` *or* `Merge Mode: pr`
+
+This can be edited later in `roadmap/state.md` if the workflow changes.
+
+## Step 5 — Catalog selection
 
 Use `vscode_askQuestions` once to ask the human which catalog items to activate. Show the list from `.github/catalog/MANIFEST.md` grouped by type. Copy each selected file from `.github/catalog/<type>/` to `.github/<type>/`. Do not apply heuristics — the human decides.
 
-Stack skills are **not** created here. The builder creates one skill per adopted technology during phase 1 execution.
+The **researcher** subagent ships as a core agent in v1.2+ — no activation needed. If `.github/catalog/agents/researcher.agent.md` ever exists, ignore it.
 
-## Step 5 — Finalize and self-delete
+Stack skills are **not** created here. The builder creates one skill per adopted technology during phase implementation, and the researcher subagent creates them on demand.
+
+## Step 6 — Finalize and self-delete
 
 Order matters here. The Stop hook diffs the working tree against `HEAD` and refuses to let the session end if non-allowlisted files have changed for the current Stage. If you flip Stage out of `bootstrap` while the tree is still dirty, the gate will block. Do these in order:
 
-1. Append to `roadmap/CURRENT-STATE.md` `## Context`: `[ISO8601] bootstrap: vision + phase 1 design drafted, catalog activated (<list>)`.
+1. Append to `roadmap/CURRENT-STATE.md` `## Context`: `[ISO8601] bootstrap: vision drafted, merge mode = <cli|pr>, catalog activated (<list>). Next: /strategize.`
 2. Save a repo-memory note at `/memories/repo/bootstrap.md` summarizing the vision and tech stack.
 3. Delete this file (`BOOTSTRAP.md`). After this session, it should not exist.
-4. `git add -A && git commit -m "bootstrap: vision, phase 1 design, catalog activation"` so the working tree is clean.
-5. **Last:** set `roadmap/state.md` `Stage: design-critique`, `Blocked Kind: n/a`, then commit that single state.md change. The Stage flip must be the final mutation, on a clean tree.
+4. `git add -A && git commit -m "bootstrap: vision, merge mode, catalog activation"` so the working tree is clean. (Branch-gate is exempt during `bootstrap` stage, so this commit on `main` is allowed; subsequent stages must use feature branches.)
+5. **Last:** set `roadmap/state.md` `Stage: strategy`, `Blocked Kind: n/a`, `Next Prompt: /strategize`, then commit that single state.md change. The Stage flip must be the final mutation, on a clean tree.
 
-The next session resumes from `Stage: design-critique` — the critic will review the phase 1 design.
+The next session resumes from `Stage: strategy` — the strategize prompt (added in v1.2 / Block 2) will read the vision, present candidate phases (with optional `/research` recommendations from Step 3.5), and ask the human to pick one before any design work begins.

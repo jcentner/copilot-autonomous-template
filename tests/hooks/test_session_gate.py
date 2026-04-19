@@ -162,6 +162,107 @@ class SessionGateTests(unittest.TestCase):
         self.assertEqual(self._decision(out), "block")
         self.assertIn("Implementation Status", out["hookSpecificOutput"]["reason"])
 
+    # --- v1.2: New blocked kinds. ---
+
+    def test_blocked_awaiting_strategy_approval_allows(self):
+        out = self._run(stage="blocked", blocked_kind="awaiting-strategy-approval")
+        self.assertEqual(self._decision(out), "allow")
+
+    def test_blocked_awaiting_merge_approval_allows(self):
+        out = self._run(stage="blocked", blocked_kind="awaiting-merge-approval")
+        self.assertEqual(self._decision(out), "allow")
+
+    def test_blocked_scrapped_by_human_allows(self):
+        out = self._run(stage="blocked", blocked_kind="scrapped-by-human")
+        self.assertEqual(self._decision(out), "allow")
+
+    # --- v1.2: Next Prompt + recommendations rendering. ---
+
+    def test_allow_includes_system_message_with_next_prompt(self):
+        make_state(
+            self.tmp,
+            stage="blocked",
+            blocked_kind="awaiting-design-approval",
+            next_prompt="/resume",
+        )
+        rc, out, _ = run_hook(
+            "session-gate.py", {"cwd": str(self.tmp)}, cwd=self.tmp
+        )
+        self.assertEqual(rc, 0)
+        msg = out.get("systemMessage", "")
+        self.assertIn("→ Next: /resume", msg)
+
+    def test_allow_omits_message_when_next_prompt_is_na(self):
+        make_state(
+            self.tmp,
+            stage="blocked",
+            blocked_kind="awaiting-design-approval",
+            next_prompt="n/a",
+        )
+        rc, out, _ = run_hook(
+            "session-gate.py", {"cwd": str(self.tmp)}, cwd=self.tmp
+        )
+        self.assertEqual(rc, 0)
+        # No systemMessage at all (or empty) when nothing useful to say.
+        self.assertNotIn("→ Next:", out.get("systemMessage", ""))
+
+    def test_block_reason_includes_next_prompt_when_set(self):
+        make_state(
+            self.tmp,
+            stage="executing",
+            tests_pass="no",
+            next_prompt="/implement",
+        )
+        rc, out, _ = run_hook(
+            "session-gate.py", {"cwd": str(self.tmp)}, cwd=self.tmp
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._decision(out), "block")
+        reason = out["hookSpecificOutput"]["reason"]
+        self.assertIn("→ Next: /implement", reason)
+
+    def test_recommendations_rendered_when_config_present(self):
+        make_state(
+            self.tmp,
+            stage="blocked",
+            blocked_kind="awaiting-design-approval",
+            next_prompt="/resume",
+        )
+        cfg_dir = self.tmp / ".github" / "hooks" / "config"
+        cfg_dir.mkdir(parents=True)
+        (cfg_dir / "stage-recommendations.json").write_text(
+            '{"blocked": {"prompts": ["/resume"], "skills": ["evidence-gathering"]}}'
+        )
+        rc, out, _ = run_hook(
+            "session-gate.py", {"cwd": str(self.tmp)}, cwd=self.tmp
+        )
+        self.assertEqual(rc, 0)
+        msg = out.get("systemMessage", "")
+        self.assertIn("→ Consider:", msg)
+        self.assertIn("evidence-gathering", msg)
+
+    # --- v1.2: Strategy-artifact gate (planning stage). ---
+
+    def test_planning_stage_blocks_without_strategy_artifact(self):
+        out = self._run(stage="planning")
+        self.assertEqual(self._decision(out), "block")
+        self.assertIn("strategy", out["hookSpecificOutput"]["reason"].lower())
+
+    def test_planning_stage_allows_with_strategy_artifact(self):
+        make_state(self.tmp, stage="planning")
+        (self.tmp / "roadmap" / "strategy-20260419-120000.md").write_text("# pick\n")
+        rc, out, _ = run_hook(
+            "session-gate.py", {"cwd": str(self.tmp)}, cwd=self.tmp
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._decision(out), "allow")
+
+    # --- v1.2: strategy stage falls under NON_EXECUTING_STAGES. ---
+
+    def test_strategy_stage_allows_when_clean(self):
+        out = self._run(stage="strategy")
+        self.assertEqual(self._decision(out), "allow")
+
 
 if __name__ == "__main__":
     unittest.main()

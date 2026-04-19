@@ -22,6 +22,62 @@ values before resuming.
 
 ## Routing by Blocked Kind
 
+### `awaiting-strategy-approval`
+
+The strategize prompt was escaped via "save and let me think". The latest
+candidate list is in the most recent `roadmap/strategy-*.md` artifact.
+
+1. Find the latest artifact: `ls roadmap/strategy-*.md | sort | tail -1`.
+2. Compare its mtime against `docs/plans/`, `docs/reference/open-questions.md`,
+   `docs/reference/tech-debt.md`, and recent `CURRENT-STATE.md` `## Context`
+   entries. If any are newer than the artifact, the candidate list is stale —
+   re-run `/strategize` instead of re-presenting.
+3. Otherwise re-present the candidates via `vscode_askQuestions`.
+4. On a pick (any of the listed candidates):
+   - If `Phase == 0`, set `Phase: 1`. Otherwise leave `Phase` alone.
+   - Set `Phase Title: <chosen title>`.
+   - Set `Stage: planning`, `Blocked Kind: n/a`, `Next Prompt: /design-plan`.
+   - Append to `## Context`: `[ISO8601] resume: strategy approved (phase N — <title>)`.
+
+### `awaiting-merge-approval`
+
+`/merge-phase` ran. The agent printed the merge commands or PR URL and
+stopped. Human-side merge happens outside this loop. This branch confirms
+the merge landed, then advances Phase.
+
+1. Read `Phase` and `Phase Title` from `state.md`.
+2. Try to verify the merge via git:
+   ```
+   git fetch origin --quiet 2>/dev/null
+   git log origin/main --grep="phase[ -/]N" --max-count=1
+   ```
+   (substitute `N` with the current Phase number).
+3. If the merge commit is found → proceed to step 5.
+4. If `origin` is unreachable / not configured / no match → `vscode_askQuestions`:
+   "Confirm phase N merge completed? [yes / no / cancel]". On `yes` proceed; on
+   `no` refuse to advance and leave state unchanged; on `cancel` exit silently.
+5. **Increment `Phase`** (`Phase: N+1`) and reset all Phase-scoped fields:
+   - `Phase Title: Strategy Pending`
+   - `Design Plan: n/a`, `Design Status: n/a`, `Design Critique Rounds: 0`
+   - `Implementation Plan: n/a`, `Implementation Status: n/a`,
+     `Implementation Critique Rounds: 0`
+   - `Active Slice: n/a`, `Slice Total: n/a`
+   - All Slice Evidence fields (`Evidence For Slice`, `Tests Written`,
+     `Tests Pass`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings: 0`,
+     `Major Findings: 0`, `Strategic Review`, `Committed`) → `n/a` / `0`
+   - `Blocked Kind: n/a`, `Blocked Reason: n/a`
+   - `Stage: strategy`, `Next Prompt: /strategize`
+6. Append to `## Context`: `[ISO8601] resume: phase N merge confirmed; advancing to strategy for phase N+1`.
+
+### `scrapped-by-human`
+
+`/scrap-phase` ran. The phase artifacts were archived; Phase number is
+unchanged (the abandoned number is reused for the next pick).
+
+1. `Blocked Kind: scrapped-by-human` is a transient marker only — clear it.
+2. Set `Stage: strategy`, `Blocked Kind: n/a`, `Next Prompt: /strategize`.
+3. Append to `## Context`: `[ISO8601] resume: post-scrap; running strategize for replacement phase N`.
+
 ### `awaiting-design-approval`
 
 The autonomous-builder finished a design plan + critique cycle and is

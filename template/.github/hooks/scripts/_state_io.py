@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import json
 import os
 import re
 import tempfile
@@ -31,6 +32,7 @@ ROADMAP_DIRNAME = "roadmap"
 # Stage vocabulary — kept here so every hook agrees on it.
 VALID_STAGES = {
     "bootstrap",
+    "strategy",
     "planning",
     "design-critique",
     "implementation-planning",
@@ -46,11 +48,35 @@ VALID_STAGES = {
 # treated as missing).
 VALID_BLOCKED_KINDS = {
     "awaiting-design-approval",
+    "awaiting-strategy-approval",
+    "awaiting-merge-approval",
     "awaiting-vision-update",
     "awaiting-human-decision",
+    "scrapped-by-human",
     "error",
     "vision-exhausted",
 }
+
+# Allowed values for the `Next Prompt` machine field. Validated by
+# record-verdict.py and merge-phase prompt logic.
+VALID_NEXT_PROMPTS = {
+    "n/a",
+    "/strategize",
+    "/design-plan",
+    "/implementation-plan",
+    "/implement",
+    "/code-review",
+    "/merge-phase",
+    "/resume",
+    "/scrap-phase",
+    "/vision-expand",
+    "/catalog-review",
+    "/research",
+    "/phase-complete",
+}
+
+# Allowed values for the `Merge Mode` machine field. Picked at bootstrap.
+VALID_MERGE_MODES = {"cli", "pr", "n/a"}
 
 _FIELD_RE = re.compile(r"^\s*-\s+\*\*([^*]+)\*\*:\s*(.*?)\s*$")
 _UNCHECKED_RE = re.compile(r"^\s*-\s+\[ \]\s+(.*?)\s*$")
@@ -255,3 +281,40 @@ def update_active_session_link(cwd: str, session_id: str) -> None:
 def is_unchecked_checklist(items: Iterable[str]) -> list:
     """Return the list as-is — kept as a thin alias for clarity at call sites."""
     return list(items)
+
+
+def is_bootstrap_stage(cwd: str) -> bool:
+    """Return True when state.md is absent OR Stage is `bootstrap`.
+
+    Shared by tool-guardrails.py (enforcement-layer carve-out) and
+    branch-gate.py (commit-on-main carve-out). A missing state.md is
+    treated as bootstrap so a fresh `copier copy` workspace doesn't
+    immediately trip every gate.
+    """
+    if not cwd:
+        return False
+    try:
+        if not state_exists(cwd):
+            return True
+        return get_field(cwd, "Stage") == "bootstrap"
+    except OSError:
+        return False
+
+
+def load_json_config(cwd: str, relpath: str, default):
+    """Load a JSON config file under the workspace; return `default` on any error.
+
+    Used by branch-gate.py and session-gate.py to read
+    `.github/hooks/config/*.json`. Best-effort — a malformed or absent
+    config never crashes a hook; callers must always pass a usable default.
+    """
+    if not cwd:
+        return default
+    path = os.path.join(cwd, relpath)
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return default

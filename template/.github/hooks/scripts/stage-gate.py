@@ -39,6 +39,13 @@ ALLOWLISTED_PREFIXES = (
     ".github/",
 )
 
+# Per-stage extra denylist: paths that pass the standard allowlist above but
+# are still forbidden for this specific Stage. Used to keep `strategy` from
+# writing phase artifacts (which only `planning` should produce).
+STAGE_PATH_DENYLIST = {
+    "strategy": ("roadmap/phases/",),
+}
+
 # Stages where edits are unrestricted.
 # `cleanup` is intentionally NOT in this set: during phase wrap-up, only
 # doc/roadmap/.github edits should happen. If a source fix is genuinely
@@ -187,6 +194,16 @@ def main():
                 "allowed path."
             )
             return
+        # Per-stage denylist (e.g., strategy may not write phase artifacts).
+        denied_prefixes = STAGE_PATH_DENYLIST.get(stage, ())
+        for bad in denied_prefixes:
+            if rel.startswith(bad):
+                deny(
+                    f"Stage is '{stage}' — edits to '{rel}' are blocked because "
+                    f"'{bad}' is reserved for a later stage. Advance Stage "
+                    "first (strategy → planning) before writing phase artifacts."
+                )
+                return
 
     allow()
 

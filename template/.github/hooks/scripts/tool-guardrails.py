@@ -22,10 +22,9 @@ import re
 import sys
 
 try:
-    from _state_io import get_field as _get_stage_field, state_exists as _state_exists
+    from _state_io import is_bootstrap_stage as _shared_is_bootstrap_stage
 except ImportError:  # pragma: no cover — running standalone without sibling module
-    _get_stage_field = None
-    _state_exists = None
+    _shared_is_bootstrap_stage = None
 
 
 TERMINAL_TOOLS = {"run_in_terminal", "send_to_terminal"}
@@ -175,25 +174,20 @@ def check_terminal_command(tool_input):
 
 
 def _is_bootstrap_stage(cwd):
-    """Return True when state.md exists and Stage is `bootstrap`.
+    """Return True when state.md is absent OR Stage is `bootstrap`.
 
     Bootstrap is the only stage where the builder may legitimately write to
     enforcement-layer paths — catalog activation copies files into
     `.github/agents/` from `.github/catalog/`. Every other stage remains
     locked.
 
-    Fails closed: if state.md can't be read, treat as non-bootstrap.
+    Delegates to the shared `_state_io.is_bootstrap_stage` so branch-gate
+    and tool-guardrails agree on the carve-out semantics. Fails closed if
+    the helper is unavailable.
     """
-    if not cwd or _get_stage_field is None or _state_exists is None:
+    if _shared_is_bootstrap_stage is None:
         return False
-    try:
-        if not _state_exists(cwd):
-            # No state file at all — a fresh `copier copy` workspace before
-            # any stage has been written. That is effectively bootstrap.
-            return True
-        return _get_stage_field(cwd, "Stage") == "bootstrap"
-    except OSError:
-        return False
+    return _shared_is_bootstrap_stage(cwd)
 
 
 def _normalize(path, cwd=None):

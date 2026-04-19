@@ -6,6 +6,19 @@
 
 This project uses an AI-assisted autonomous development workflow powered by GitHub Copilot.
 
+### When to use the autonomous builder
+
+The `autonomous-builder` agent is for **major feature work** that goes through the full strategy → design → implement → review → merge pipeline. The pipeline has **three hook-enforced human approval gates**:
+
+```
+bootstrap → strategy → planning → design-critique → [GATE 1: design approval]
+        → implementation-planning → implementation-critique → executing
+        → reviewing → cleanup → [GATE 2: merge approval]
+        → strategy (loop, with optional [GATE 0: strategy approval] when escaped)
+```
+
+For **typos, docs-only edits, one-line bug fixes, and hot-fixes**, use plain Copilot Agent mode (no agent picker). The strategy + critique rounds are overhead you don't need for trivial changes. This split is doc-only — no hook enforces it.
+
 ### Quick Start
 
 1. Open this repo in VS Code

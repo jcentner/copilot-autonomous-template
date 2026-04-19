@@ -20,6 +20,7 @@ Return schema (per Copilot hooks docs):
     }}
 Empty object on allow.
 """
+import glob
 import json
 import os
 import subprocess
@@ -28,6 +29,7 @@ import sys
 from _state_io import (
     VALID_BLOCKED_KINDS,
     VALID_STAGES,
+    load_json_config,
     parse_state,
     state_exists,
 )
@@ -43,6 +45,7 @@ ALLOWLISTED_PREFIXES = ("roadmap/", "docs/", ".github/")
 ALLOWLISTED_PATHS = frozenset({"BOOTSTRAP.md"})
 
 NON_EXECUTING_STAGES = {
+    "strategy",
     "planning",
     "design-critique",
     "implementation-planning",
@@ -55,21 +58,63 @@ TERMINAL_REVIEW_VERDICTS = {"pass", "n/a"}
 BLOCKING_REVIEW_VERDICTS = {"pending", "needs-fixes", "needs-rework"}
 
 
-def block(reason):
-    json.dump(
-        {
-            "hookSpecificOutput": {
-                "hookEventName": "Stop",
-                "decision": "block",
-                "reason": reason,
-            }
-        },
-        sys.stdout,
+def block(reason, fields=None, cwd=None):
+    out = {
+        "hookSpecificOutput": {
+            "hookEventName": "Stop",
+            "decision": "block",
+            "reason": _augment_with_next_prompt(reason, fields, cwd),
+        }
+    }
+    json.dump(out, sys.stdout)
+
+
+def allow(fields=None, cwd=None):
+    """Allow Stop. Surface a `Next Prompt` / `Consider` hint via top-level
+    `systemMessage` if state.md has them set (and not `n/a`).
+    """
+    msg = _next_prompt_message(fields, cwd)
+    if msg:
+        json.dump({"systemMessage": msg}, sys.stdout)
+    else:
+        json.dump({}, sys.stdout)
+
+
+def _augment_with_next_prompt(reason, fields, cwd):
+    msg = _next_prompt_message(fields, cwd)
+    if msg:
+        return f"{reason}\n\n{msg}"
+    return reason
+
+
+def _next_prompt_message(fields, cwd):
+    if not fields:
+        return ""
+    parts = []
+    next_prompt = (fields.get("next prompt", "") or "").strip()
+    if next_prompt and next_prompt.lower() != "n/a":
+        parts.append(f"→ Next: {next_prompt}")
+    stage = (fields.get("stage", "") or "").strip().lower()
+    if cwd and stage:
+        recs = _stage_recommendations(cwd, stage)
+        if recs:
+            parts.append(f"→ Consider: {recs}")
+    return "\n".join(parts)
+
+
+def _stage_recommendations(cwd, stage):
+    config = load_json_config(
+        cwd,
+        ".github/hooks/config/stage-recommendations.json",
+        default={},
     )
-
-
-def allow():
-    json.dump({}, sys.stdout)
+    entry = config.get(stage) or {}
+    items = []
+    for prompt in entry.get("prompts", []) or []:
+        items.append(str(prompt))
+    for skill in entry.get("skills", []) or []:
+        items.append(f"skill:{skill}")
+    return ", ".join(items)
 
 
 def get(fields, key, default=""):
@@ -123,7 +168,7 @@ def main():
     stage = get(fields, "stage")
 
     if not stage:
-        allow()
+        allow(fields, cwd)
         return
 
     # Unknown stage value → fail CLOSED.
@@ -131,13 +176,15 @@ def main():
         block(
             f"Unknown Stage value '{stage}' in roadmap/state.md. "
             f"Valid values: {', '.join(sorted(VALID_STAGES))}. "
-            f"Fix the Stage field before stopping."
+            f"Fix the Stage field before stopping.",
+            fields,
+            cwd,
         )
         return
 
     # `complete` allows stop unconditionally — vision exhausted.
     if stage == "complete":
-        allow()
+        allow(fields, cwd)
         return
 
     # `blocked` allows stop only when Blocked Kind is set to a valid value.
@@ -150,10 +197,12 @@ def main():
                 f"Stage is 'blocked' but Blocked Kind is '{kind or 'unset'}'. "
                 f"Set Blocked Kind in roadmap/state.md to one of "
                 f"{', '.join(sorted(VALID_BLOCKED_KINDS))} and explain the "
-                f"situation in Blocked Reason. Use /resume to unblock."
+                f"situation in Blocked Reason. Use /resume to unblock.",
+                fields,
+                cwd,
             )
             return
-        allow()
+        allow(fields, cwd)
         return
 
     # Terminal-bypass backstop for non-executing stages.
@@ -166,7 +215,24 @@ def main():
                 f"Stage is '{stage}' but source files outside the allowlist have "
                 f"been modified: {sample}{more}. Revert with "
                 f"`git checkout -- <path>`, stash the changes, or advance Stage "
-                f"to 'executing' (requires approved design + implementation plans)."
+                f"to 'executing' (requires approved design + implementation plans).",
+                fields,
+                cwd,
+            )
+            return
+
+    # Strategy-artifact gate: cannot stop in `planning` without evidence the
+    # strategy stage produced an artifact (sets the candidate + rationale).
+    if stage == "planning":
+        if not _strategy_artifact_exists(cwd):
+            block(
+                "Stage is 'planning' but no strategy artifact "
+                "(roadmap/strategy-*.md) exists. The strategize prompt must "
+                "run before planning \u2014 a phase pick without recorded "
+                "rationale is a gap. Run /strategize, or rewind Stage to "
+                "'strategy' and produce the artifact.",
+                fields,
+                cwd,
             )
             return
 
@@ -234,7 +300,9 @@ def main():
                 + "; ".join(reasons)
                 + ". Finish the slice loop before stopping: run tests, invoke the "
                 "reviewer, fix Critical/Major findings, commit, and update the "
-                "Slice Evidence fields in roadmap/state.md."
+                "Slice Evidence fields in roadmap/state.md.",
+                fields,
+                cwd,
             )
             return
 
@@ -245,7 +313,9 @@ def main():
                 "Stage is 'reviewing' but Strategic Review is 'pending'. Invoke "
                 "the product-owner (or planner) to perform strategic review, "
                 "then set Strategic Review to 'pass', 'replan', or 'n/a' in "
-                "roadmap/state.md."
+                "roadmap/state.md.",
+                fields,
+                cwd,
             )
             return
 
@@ -256,7 +326,9 @@ def main():
             block(
                 f"Stage is 'cleanup' with unchecked Phase Completion Checklist "
                 f"items: {sample}{more}. Complete the phase-complete protocol "
-                f"and check all items in roadmap/state.md before stopping."
+                f"and check all items in roadmap/state.md before stopping.",
+                fields,
+                cwd,
             )
             return
 
@@ -266,7 +338,9 @@ def main():
             block(
                 "Stage is 'design-critique' and Design Status is 'in-critique'. "
                 "Finish the critique round and set Design Status to 'approved', "
-                "'revise', or 'rethink'."
+                "'revise', or 'rethink'.",
+                fields,
+                cwd,
             )
             return
 
@@ -276,11 +350,18 @@ def main():
             block(
                 "Stage is 'implementation-critique' and Implementation Status is "
                 "'in-critique'. Finish the critique round and set Implementation "
-                "Status to 'approved', 'revise', or 'rethink'."
+                "Status to 'approved', 'revise', or 'rethink'.",
+                fields,
+                cwd,
             )
             return
 
-    allow()
+    allow(fields, cwd)
+
+
+def _strategy_artifact_exists(cwd):
+    pattern = os.path.join(cwd, "roadmap", "strategy-*.md")
+    return bool(glob.glob(pattern))
 
 
 if __name__ == "__main__":

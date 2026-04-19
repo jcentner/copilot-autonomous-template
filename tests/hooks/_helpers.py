@@ -45,6 +45,8 @@ def make_state(
     evidence_for_slice=None,
     checklist_checked=True,
     write_narrative=True,
+    next_prompt="n/a",
+    merge_mode="n/a",
 ):
     """Create roadmap/state.md (machine fields) under tmp_path; return workspace root."""
     roadmap = tmp_path / "roadmap"
@@ -72,6 +74,8 @@ def make_state(
         - **Active Slice**: {active_slice}
         - **Slice Total**: 3
         - **Blocked Reason**: n/a
+        - **Next Prompt**: {next_prompt}
+        - **Merge Mode**: {merge_mode}
 
         ## Slice Evidence
 

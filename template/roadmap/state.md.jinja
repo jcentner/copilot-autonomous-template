@@ -8,11 +8,15 @@
   CURRENT-STATE.md. Per-session activity logs live in sessions/.
 
   Stage vocabulary:
-    bootstrap | planning | design-critique | implementation-planning |
+    bootstrap | strategy | planning | design-critique | implementation-planning |
     implementation-critique | executing | reviewing | cleanup | blocked | complete
 
+  After `cleanup` the loop returns to `strategy` (NOT `planning`). The
+  strategize prompt picks the next phase; planning then drafts its design.
+
   Blocked Kind vocabulary (required when Stage = blocked, else n/a):
-    awaiting-design-approval | awaiting-vision-update | awaiting-human-decision |
+    awaiting-design-approval | awaiting-strategy-approval | awaiting-merge-approval |
+    awaiting-vision-update | awaiting-human-decision | scrapped-by-human |
     error | vision-exhausted | n/a
 
   Status vocabulary (Design Status, Implementation Status):
@@ -26,6 +30,16 @@
 
   Strategic Review vocabulary:
     pending | pass | replan | n/a
+
+  Next Prompt vocabulary (the slash-command the human / orchestrator should
+  run next; rendered by session-gate.py at every Stop):
+    n/a | /strategize | /design-plan | /implementation-plan | /implement |
+    /code-review | /merge-phase | /resume | /scrap-phase | /vision-expand |
+    /catalog-review | /research | /phase-complete
+
+  Merge Mode vocabulary (how phase branches are merged back to main; picked
+  at bootstrap, edit here to change later):
+    cli | pr | n/a
 -->
 
 ## Workflow State
@@ -46,6 +60,8 @@
 - **Active Slice**: n/a
 - **Slice Total**: n/a
 - **Blocked Reason**: n/a
+- **Next Prompt**: n/a
+- **Merge Mode**: n/a
 
 ## Slice Evidence
 
