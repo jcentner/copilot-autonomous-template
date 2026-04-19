@@ -15,6 +15,8 @@ Abandon the current phase before merge. The phase number is **burned** — the n
    > Working tree is dirty. Commit or stash your changes before scrapping — scrapped phases archive their artifacts, but uncommitted source edits would be orphaned.
    > Override path (discouraged): re-invoke `/scrap-phase --force`. Forced scraps still archive artifacts; uncommitted edits remain in the working tree and become your problem.
 
+   `--force` is interpreted by the agent reading this prompt — there is no flag-parsing CLI. The override exists so the human can verbally say "scrap with --force" and the agent treats that as explicit consent to proceed on a dirty tree. Do not infer the override from anything other than literal `--force` (or equivalent unambiguous human instruction in the same turn).
+
 3. Read `Phase` (the number being scrapped) and `Phase Title`. Confirm the scrap intent with `vscode_askQuestions`:
 
    - Options: "**Yes — scrap phase N (<title>)**" / "**Cancel**".

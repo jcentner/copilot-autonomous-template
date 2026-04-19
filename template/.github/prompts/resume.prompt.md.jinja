@@ -35,6 +35,7 @@ candidate list is in the most recent `roadmap/strategy-*.md` artifact.
 3. Otherwise re-present the candidates via `vscode_askQuestions`.
 4. On a pick (any of the listed candidates):
    - If `Phase == 0`, set `Phase: 1`. Otherwise leave `Phase` alone.
+   - **Cut the phase branch before mutating state:** `git checkout -b phase/<N>-<kebab-title>` (off `strategy/*` or `main`, whichever the agent is on). Required for `branch-gate.py` and `/merge-phase`'s branch-name precondition.
    - Set `Phase Title: <chosen title>`.
    - Set `Stage: planning`, `Blocked Kind: n/a`, `Next Prompt: /design-plan`.
    - Append to `## Context`: `[ISO8601] resume: strategy approved (phase N — <title>)`.
@@ -67,7 +68,14 @@ the merge landed, then advances Phase.
      `Major Findings: 0`, `Strategic Review`, `Committed`) → `n/a` / `0`
    - `Blocked Kind: n/a`, `Blocked Reason: n/a`
    - `Stage: strategy`, `Next Prompt: /strategize`
-6. Append to `## Context`: `[ISO8601] resume: phase N merge confirmed; advancing to strategy for phase N+1`.
+6. **Cut a fresh strategy branch off updated `main`** so the next session's first commit (the strategize artifact) doesn't fight `branch-gate.py`:
+   ```bash
+   git checkout main
+   git pull --ff-only
+   git checkout -b strategy/$(date -u +%Y%m%d)
+   ```
+   Then commit the state.md changes from step 5 on this branch.
+7. Append to `## Context`: `[ISO8601] resume: phase N merge confirmed; advancing to strategy for phase N+1`.
 
 ### `scrapped-by-human`
 

@@ -104,7 +104,29 @@ for the design rationale.
   `awaiting-strategy-approval` and `awaiting-merge-approval` Blocked
   Kinds; explicit `Next Prompt` for every transition; `cleanup` no
   longer loops to `planning` — it sets `awaiting-merge-approval`.
-  Researcher and `branch-gate.py` registered.
+  Researcher and `branch-gate.py` registered. New "Branch hygiene"
+  section documents the `strategy/<date>` ↔ `phase/N-<theme>` branch
+  cuts so `branch-gate.py` and `/merge-phase` stay happy.
+- **`/phase-complete` Step 9 rewritten** — no longer increments
+  `Phase`, resets Slice Evidence, or sets `Stage: planning`. Now hands
+  off to the merge gate by setting `Stage: blocked` / `Blocked Kind:
+  awaiting-merge-approval` / `Next Prompt: /merge-phase`. The previous
+  behavior would have silently bypassed the merge approval gate (the
+  marquee v1.2 feature) and wiped the `Review Verdict` / `doc-sync:
+  missing` rows that `/merge-phase` scans before approving the merge.
+  Phase increment + Phase-scoped resets now live exclusively in
+  `/resume awaiting-merge-approval`. Smoke test asserts
+  `/phase-complete` does not contain the v1.1-era instructions.
+- **`BOOTSTRAP.md` Step 5 added** — cuts a `strategy/<UTC-date>` branch
+  before flipping `Stage: strategy` so the next session's first commit
+  doesn't fight `branch-gate.py`.
+- **`/strategize` and `/resume`** — explicit `git checkout -b
+  phase/<N>-<kebab>` instructions on inline pick / strategy resume;
+  `/resume awaiting-merge-approval` cuts a fresh strategy branch off
+  updated `main` before mutating state.
+- **`/strategize` autopilot warning** — surfaces a one-line note when
+  autopilot may be on, since `vscode_askQuestions` auto-answer
+  degrades the strategy gate.
 - **AGENTS.md core-agents table** — researcher row added.
 - **Catalog MANIFEST preamble** — notes that researcher is core in v1.2+.
 
@@ -121,6 +143,19 @@ for the design rationale.
     — projects on trunk-based development must edit
     `.github/hooks/config/branch-policy.json` to remove `main` from the
     denylist.
+  - **`Stage: planning` carry-overs need a strategy artifact stub.**
+    `session-gate.py` now blocks Stop in `planning` when no
+    `roadmap/strategy-*.md` exists. v1.1 projects mid-flight in
+    `planning` should `touch
+    roadmap/strategy-grandfathered-from-v1.1.md` (one-line content:
+    "Phase chosen pre-v1.2; no strategize artifact recorded.") to clear
+    the gate. Future phases will write real timestamped artifacts.
+  - **`/phase-complete` now hands off to the merge gate** instead of
+    incrementing Phase + setting `Stage: planning`. v1.1 projects that
+    have a half-completed `cleanup` in flight should re-run
+    `/phase-complete` after `copier update` — Step 9 is now a state
+    handoff (`Stage: blocked` / `Blocked Kind:
+    awaiting-merge-approval`), not a Phase increment.
   - `/merge-phase` only supports GitHub for v1.2 (CLI or PR via `gh` /
     compare URL). GitLab / Bitbucket are v1.3+ candidates.
 

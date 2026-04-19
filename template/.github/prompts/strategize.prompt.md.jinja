@@ -45,6 +45,8 @@ Use `vscode_askQuestions` with options:
 
 Mark the planner-recommended top pick as `recommended: true` (your best guess); the human is free to choose anything.
 
+**Autopilot warning.** If autopilot is enabled, `vscode_askQuestions` will be auto-answered — the gate degrades to "pick whatever the planner ranked first." This silently defeats the strategy approval gate. Before presenting, surface a one-line note in the chat: *"Autopilot is on; the strategy gate is degraded. Disable autopilot to make this an actual human decision."* This is advisory only — there is no hook that detects autopilot state.
+
 ## Phase D — Write artifact
 
 Write to `roadmap/strategy-YYYYMMDD-HHMMSSZ.md` (UTC, lex-sortable; the latest by sorted filename is canonical). Required sections:
@@ -90,6 +92,16 @@ Apply per the `Phase` value rules in [`autonomous-builder.agent.md`](../agents/a
 
 - If `Phase == 0` (post-bootstrap, never strategized before): set `Phase: 1`.
 - Else: leave `Phase` alone (it was already incremented by `/resume` post-merge, or set by a prior scrap path).
+
+**Cut the phase branch before mutating state.** Compute a kebab-case slug of the picked title, then:
+
+```bash
+# If currently on `strategy/*` (typical post-bootstrap path), branch off it.
+# If on `main` (e.g., after /resume post-merge cut a fresh strategy branch), same.
+git checkout -b phase/<N>-<kebab-title>
+```
+
+`branch-gate.py` denies commits on `main`/`master`/`trunk`/`prod` outside bootstrap; `/merge-phase` requires the current branch to match `^phase/N-` for the merge handshake. Cutting the branch here makes both happy.
 
 Then update [`state.md`](../../roadmap/state.md):
 

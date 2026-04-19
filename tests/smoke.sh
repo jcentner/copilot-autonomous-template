@@ -172,6 +172,22 @@ for token in "strategy-" "least 3 candidates" "awaiting-strategy-approval"; do
     exit 1
   fi
 done
+
+echo "==> phase-complete prompt: hands off to merge gate (does NOT bypass it)"
+for token in "awaiting-merge-approval" "/merge-phase"; do
+  if ! grep -q "$token" "$TMP/.github/prompts/phase-complete.prompt.md"; then
+    echo "FAIL: phase-complete.prompt.md missing token: $token" >&2
+    exit 1
+  fi
+done
+# Forbid the v1.1-era Step 9 instructions that would silently bypass the
+# merge gate by incrementing Phase / setting Stage: planning here.
+for forbidden in "Increment \*\*Phase\*\* by 1" "Set \*\*Stage\*\* to \`planning\`"; do
+  if grep -q "$forbidden" "$TMP/.github/prompts/phase-complete.prompt.md"; then
+    echo "FAIL: phase-complete.prompt.md still contains v1.1-era instruction: $forbidden" >&2
+    exit 1
+  fi
+done
 echo "==> stage-gate: bootstrap stage → allow"
 out=$(echo '{"cwd":"'"$TMP"'","tool_name":"create_file","tool_input":{"filePath":"src/x.py"}}' \
   | python3 "$TMP/.github/hooks/scripts/stage-gate.py")

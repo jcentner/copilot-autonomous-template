@@ -77,6 +77,7 @@ Order matters here. The Stop hook diffs the working tree against `HEAD` and refu
 2. Save a repo-memory note at `/memories/repo/bootstrap.md` summarizing the vision and tech stack.
 3. Delete this file (`BOOTSTRAP.md`). After this session, it should not exist.
 4. `git add -A && git commit -m "bootstrap: vision, merge mode, catalog activation"` so the working tree is clean. (Branch-gate is exempt during `bootstrap` stage, so this commit on `main` is allowed; subsequent stages must use feature branches.)
-5. **Last:** set `roadmap/state.md` `Stage: strategy`, `Blocked Kind: n/a`, `Next Prompt: /strategize`, then commit that single state.md change. The Stage flip must be the final mutation, on a clean tree.
+5. **Cut a strategy branch before flipping Stage.** Run `git checkout -b strategy/$(date -u +%Y%m%d)` so the next session's first commit doesn't fight `branch-gate.py` (which denies commits to `main`/`master`/`trunk`/`prod` once Stage leaves `bootstrap`). The strategy branch is short-lived: `/strategize` will direct you to cut a `phase/N-<theme>` branch as soon as a phase is picked.
+6. **Last:** set `roadmap/state.md` `Stage: strategy`, `Blocked Kind: n/a`, `Next Prompt: /strategize`, then commit that single state.md change. The Stage flip must be the final mutation, on a clean tree.
 
 The next session resumes from `Stage: strategy` — the strategize prompt (added in v1.2 / Block 2) will read the vision, present candidate phases (with optional `/research` recommendations from Step 3.5), and ask the human to pick one before any design work begins.

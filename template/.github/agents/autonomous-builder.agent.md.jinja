@@ -203,6 +203,19 @@ Regardless of autopilot:
 - Stamp commit evidence with `write-commit-evidence.py yes` after every commit during `executing`. The helper verifies the working tree is clean (ignoring the rolling session log, `state.md`, and `__pycache__/`) before stamping; this prevents `Committed: yes` from being a lie.
 - Never `git push --force` (tool-guardrails denies); use `--force-with-lease` if absolutely necessary.
 
+### Branch hygiene
+
+`branch-gate.py` denies `git commit` on `main`/`master`/`trunk`/`prod` (and `release/*`) outside the `bootstrap` stage. The agent is responsible for being on the right branch *before* it tries to commit. The hand-offs are:
+
+| Where you are | Cut this branch | Who instructs it |
+|---|---|---|
+| End of `bootstrap` (on `main`) | `strategy/<UTC-date>` | BOOTSTRAP.md Step 5 |
+| `/strategize` inline pick (Phase N chosen) | `phase/<N>-<kebab-title>` | strategize Phase E |
+| `/resume awaiting-strategy-approval` pick | `phase/<N>-<kebab-title>` | resume routing |
+| `/resume awaiting-merge-approval` (post-merge) | `strategy/<UTC-date>` off updated `main` | resume routing |
+
+`/merge-phase` precondition #6 requires the current branch to match `^phase/N-` for the phase being merged — that's why strategize/resume cut the phase branch before mutating state, not after.
+
 ## End of session
 
 Before stopping, verify:

@@ -53,26 +53,30 @@ You are completing the current phase of {{ project_name }}. This prompt drives t
 - Check every box in the `## Phase Completion Checklist` section of `roadmap/state.md`.
 - The session-gate hook blocks session end during `cleanup` until every box is checked.
 
-### 9. Advance the state machine
-- Increment **Phase** by 1.
-- Clear `Phase Title` (next phase's planner sets it during `planning`).
-- Reset Slice Evidence fields: `Evidence For Slice: n/a`, `Tests Written: n/a`, `Tests Pass: n/a`, `Reviewer Invoked: n/a`, `Review Verdict: n/a`, `Critical Findings: 0`, `Major Findings: 0`, `Strategic Review: n/a`, `Committed: n/a`.
-- Reset `Active Slice: 1`, `Slice Total: n/a`.
-- Clear `Design Plan`, `Implementation Plan` (they will be set by next phase's planner).
-- Set `Design Status: n/a`, `Implementation Status: n/a`.
-- Reset `Design Critique Rounds: 0`, `Implementation Critique Rounds: 0`.
-- Reset `Blocked Kind: n/a`, `Blocked Reason: n/a`.
-- Set **Stage** to `planning`.
+### 9. Hand off to the merge gate
+
+**Do NOT increment `Phase`. Do NOT reset Slice Evidence, Design/Implementation fields, or critique-rounds counters here.** All Phase-scoped resets happen in `/resume` *after* the merge has landed on `origin/main` — running them now would (a) silently bypass the merge approval gate and (b) wipe the very Slice Evidence and `doc-sync: missing` rows that `/merge-phase` scans before approving the merge.
+
+The only state mutations this step performs:
+
+- Set `Stage: blocked`.
+- Set `Blocked Kind: awaiting-merge-approval`.
+- Set `Blocked Reason: "Phase N cleanup complete; awaiting /merge-phase."`.
+- Set `Next Prompt: /merge-phase`.
+
+The next session runs `/merge-phase`, which prepares the merge commands (or PR URL) per `Merge Mode`, then sits at `awaiting-merge-approval` until the human merges. `/resume` post-merge is the writer that increments `Phase`, resets Slice Evidence and Design/Implementation fields, and sets `Stage: strategy` for the next cycle.
+
+**Vision-update branch:** if Step 7 set `Stage: blocked` / `Blocked Kind: awaiting-vision-update`, leave that block in place — vision update intentionally skips the merge gate (the phase ships separately after the vision is updated).
 
 ## Output
 
-After the state machine advances, summarize:
-- Phase N status: complete.
+After the merge-gate handoff, summarize:
+- Phase N status: cleanup complete; awaiting merge approval.
 - ADRs created (list).
 - Open questions resolved / added.
 - Tech debt recorded.
 - Wrap summary path.
-- Next phase seed (if any scope is already known).
+- Next slash-command for the human: `/merge-phase`.
 
 ## Rules
 
