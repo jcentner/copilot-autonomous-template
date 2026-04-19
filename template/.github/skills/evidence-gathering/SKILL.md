@@ -1,5 +1,6 @@
 ---
-description: "Patterns for gathering empirical evidence to satisfy `Evidence-Status: needed` findings from the critic agent. Use when a finding rests on a checkable claim that has not yet been checked."
+name: evidence-gathering
+description: "Patterns for gathering empirical evidence to satisfy `Evidence-Status: needed` findings from the critic agent. USE FOR: planner responding to a critic verdict that flagged needed evidence; pre-emptively grounding design-plan claims; researcher gathering external grounding for a strategize candidate. DO NOT USE FOR: findings tagged `unmeasurable` (judgment / taste / future-fit) — argue on merits, do not invent measurements."
 ---
 
 # Evidence Gathering
