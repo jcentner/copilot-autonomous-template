@@ -55,6 +55,7 @@ required=(
   ".github/agents/tester.agent.md"
   ".github/agents/critic.agent.md"
   ".github/agents/product-owner.agent.md"
+  ".github/agents/researcher.agent.md"
   ".github/prompts/design-plan.prompt.md"
   ".github/prompts/implementation-plan.prompt.md"
   ".github/prompts/implement.prompt.md"
@@ -63,6 +64,9 @@ required=(
   ".github/prompts/phase-complete.prompt.md"
   ".github/prompts/vision-expand.prompt.md"
   ".github/prompts/resume.prompt.md"
+  ".github/prompts/strategize.prompt.md"
+  ".github/prompts/research.prompt.md"
+  ".github/prompts/merge-phase.prompt.md"
   ".github/hooks/scripts/_state_io.py"
   "docs/wraps/README.md"
   "docs/wraps/TEMPLATE.md"
@@ -124,7 +128,46 @@ if ! grep -q "branch-gate.py" "$TMP/.github/agents/autonomous-builder.agent.md";
   echo "FAIL: branch-gate.py not in autonomous-builder hooks" >&2
   exit 1
 fi
+echo "==> researcher agent: no terminal access in frontmatter, public-source rules present"
+# Extract only the YAML frontmatter (between the first two `---` lines) and
+# scan for terminal tool grants there. Body prose may legitimately reference
+# the denied tool names while explaining the constraint.
+fm=$(awk '/^---$/{c++; next} c==1 {print}' "$TMP/.github/agents/researcher.agent.md")
+if echo "$fm" | grep -qE "run_in_terminal|terminalLastCommand|terminalSelection|send_to_terminal"; then
+  echo "FAIL: researcher.agent.md frontmatter must not grant terminal tools" >&2
+  echo "$fm" >&2
+  exit 1
+fi
+for token in "public" "citation" "ISO8601"; do
+  if ! grep -qi "$token" "$TMP/.github/agents/researcher.agent.md"; then
+    echo "FAIL: researcher.agent.md missing required guidance token: $token" >&2
+    exit 1
+  fi
+done
 
+echo "==> reviewer agent: doc-sync two-tier severity present"
+for token in "doc-sync: missing" "merge gate"; do
+  if ! grep -q "$token" "$TMP/.github/agents/reviewer.agent.md"; then
+    echo "FAIL: reviewer.agent.md missing doc-sync token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> merge-phase prompt: gates on Merge Mode + doc-sync"
+for token in "Merge Mode" "doc-sync: missing" "awaiting-merge-approval"; do
+  if ! grep -q "$token" "$TMP/.github/prompts/merge-phase.prompt.md"; then
+    echo "FAIL: merge-phase.prompt.md missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> strategize prompt: writes timestamped artifact + at-least-3 candidates rule"
+for token in "strategy-" "least 3 candidates" "awaiting-strategy-approval"; do
+  if ! grep -q "$token" "$TMP/.github/prompts/strategize.prompt.md"; then
+    echo "FAIL: strategize.prompt.md missing token: $token" >&2
+    exit 1
+  fi
+done
 echo "==> stage-gate: bootstrap stage → allow"
 out=$(echo '{"cwd":"'"$TMP"'","tool_name":"create_file","tool_input":{"filePath":"src/x.py"}}' \
   | python3 "$TMP/.github/hooks/scripts/stage-gate.py")

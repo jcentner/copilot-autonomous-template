@@ -40,14 +40,17 @@ Prompts are **human override entry points**. The autonomous builder orchestrates
 
 | Prompt | What it does | Stage it fits | Agent |
 |--------|--------------|---------------|-------|
+| `/strategize` | Pick the next phase from grounded candidates; writes `roadmap/strategy-YYYYMMDD-HHMMSSZ.md`; flips to `planning` on approval or to `blocked` (`awaiting-strategy-approval`) on escape | `strategy` | agent |
+| `/research` | Dispatch the researcher subagent on a topic; produces `docs/reference/<topic>.md` with cited public sources | any (side-quest) | researcher |
 | `/vision-expand` | Brainstorm next directions after current vision is fulfilled | `complete` / post-vision | agent |
 | `/design-plan` | Produce user stories, acceptance criteria, non-goals, risks, ADR candidates, test strategy, slice breakdown | `planning` | planner |
 | `/implementation-plan` | Convert an approved design into a file-by-file slice plan | `implementation-planning` | planner |
 | `/implement` | Execute one slice of the approved implementation plan via the slice loop | `executing` | agent |
-| `/code-review` | Per-slice code review: architecture, quality, tests, docs-sync, security | `executing` (per slice) | reviewer |
+| `/code-review` | Per-slice code review: architecture, quality, tests, docs-sync (warning), security | `executing` (per slice) | reviewer |
 | `/strategic-review` | Phase-level strategic review ("did we build the right thing?") | `reviewing` | product-owner / planner |
-| `/resume` | Unblock a session by routing on `Blocked Kind` (design approval, vision update, human decision, error) | `blocked` | (root) |
 | `/phase-complete` | Cleanup checklist: ADRs, docs, wrap summary, advance state machine | `cleanup` | agent |
+| `/merge-phase` | Prepare phase merge per `Merge Mode` (`cli` prints commands; `pr` prints `gh` invocation or compare URL); flips to `blocked` (`awaiting-merge-approval`); never executes the merge | `cleanup` → merge gate | agent |
+| `/resume` | Unblock a session by routing on `Blocked Kind` (strategy / design / merge approval, vision update, scrap, error) | `blocked` | (root) |
 
 Each prompt reads and writes machine-readable fields in `roadmap/state.md`. SubagentStop and PreToolUse hooks verify that writes happened correctly.
 
@@ -61,8 +64,9 @@ Each prompt reads and writes machine-readable fields in `roadmap/state.md`. Suba
 | `planner` | Design plans, implementation plans, revisions, strategic-review fallback | Read + plan-file writes | Subagent |
 | `critic` | Adversarial review of design + implementation plans | Read + plan-file writes | Subagent |
 | `product-owner` | User stories (design mode) / strategic review (review mode) | Read + plan-file writes | Subagent |
-| `reviewer` | Code review + security + docs-sync | Read + state writes | Subagent |
+| `reviewer` | Code review + security + docs-sync (two-tier: warn per slice, block at merge) | Read + state writes | Subagent |
 | `tester` | Writes tests from spec without reading implementation | Scoped via `tester-isolation.py` | Subagent |
+| `researcher` | Public-source web research producing cited reference docs | Fetch/search/read/edit — **no terminal** (anti-injection) | Subagent |
 
 ### Catalog agents (activated on demand)
 
@@ -89,7 +93,7 @@ Agents support **handoffs** — the planner has a button to hand off to implemen
 │  └─────────┘  └──────────┘  └────────────────┘ │
 │                                                 │
 │  Core subagents: planner · critic · product-    │
-│  owner · reviewer · tester                      │
+│  owner · reviewer · tester · researcher          │
 │                                                 │
 │  Catalog agents (activated on demand):          │
 │  designer · security-reviewer                   │
@@ -102,7 +106,7 @@ Agents support **handoffs** — the planner has a button to hand off to implemen
 │    SubagentStop: subagent-verdict-check         │
 └─────────────────────────────────────────────────┘
 
-Manual overrides: /vision-expand  /design-plan  /implementation-plan  /implement  /code-review  /strategic-review  /phase-complete
+Manual overrides: /strategize  /research  /vision-expand  /design-plan  /implementation-plan  /implement  /code-review  /strategic-review  /phase-complete  /merge-phase  /resume
 ```
 
 ## How Prompts & Agents Work

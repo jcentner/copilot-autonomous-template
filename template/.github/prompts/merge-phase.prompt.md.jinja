@@ -1,0 +1,96 @@
+---
+description: "Prepare a phase merge. Branches on Merge Mode (cli or pr). Verifies prerequisites; prints commands or PR URL; sets Stage: blocked / awaiting-merge-approval. Agent never executes the merge."
+agent: agent
+---
+
+# Merge Phase
+
+Prepare to merge the current phase branch. The agent **never executes the merge** — it only prepares and announces commands or a PR URL. The human runs them.
+
+## Precondition
+
+1. Read [`roadmap/state.md`](../../roadmap/state.md). Required state:
+   - `Stage: cleanup` (the `/phase-complete` prompt should have just run and left state here) OR `Stage: blocked` with `Blocked Kind: awaiting-merge-approval` (re-running this prompt mid-gate).
+   - All Phase Completion Checklist items checked (the Stop hook enforces this for `cleanup`).
+   - `Strategic Review: pass` (or `n/a` if waived with reason in CURRENT-STATE.md).
+   - `Merge Mode: cli` or `Merge Mode: pr`. If `n/a`, refuse: "Merge Mode is unset. Edit `roadmap/state.md` and pick `cli` or `pr`, then re-run `/merge-phase`."
+2. Read `Phase` and `Phase Title` for the merge commit message and (PR mode) the PR title.
+3. Verify working tree is clean: `git status --porcelain` returns nothing. If dirty, refuse and list the dirty files.
+4. Verify all reviewer slice files have `Review Verdict: pass`. Scan
+   `roadmap/phases/phase-N-review-slice-*.md` for the most recent verdict per slice.
+5. **Doc-sync gate:** scan all reviewer slice files in this phase for the literal string `doc-sync: missing`. If any are unresolved, refuse with a list of the offending findings — `/merge-phase` blocks on doc-sync, even though per-slice review treats it as a warning.
+6. Verify the current branch matches `^phase/N-` (current phase). If not, refuse: the merge gate is for phase branches.
+
+## Branching by Merge Mode
+
+### `cli` mode
+
+Print these commands verbatim for the human to run. **Do not execute them.**
+
+```bash
+# 1. Push the phase branch (so it exists on origin for record)
+git push -u origin phase/N-<theme>
+
+# 2. Switch to main, fast-forward
+git checkout main
+git pull --ff-only
+
+# 3. Merge with --no-ff to preserve the phase boundary in history
+git merge --no-ff phase/N-<theme> -m "phase(N): <Phase Title>"
+
+# 4. Push the merge
+git push origin main
+
+# 5. (Optional) delete the local phase branch
+git branch -d phase/N-<theme>
+```
+
+Substitute `N` and `<theme>` from `Phase` and a kebab-case slug of `Phase Title`.
+
+### `pr` mode
+
+Print the push command, then either the `gh` invocation OR the GitHub compare URL.
+
+```bash
+git push -u origin phase/N-<theme>
+```
+
+Then **if `gh` CLI is on PATH** (check via `command -v gh` — you can run this read-only check):
+
+```bash
+gh pr create \
+  --title "phase(N): <Phase Title>" \
+  --body-file <(printf "Closes phase %s.\n\nReviewer verdicts:\n%s\n" "<N>" "$(grep -h '^Review Verdict' roadmap/phases/phase-N-review-slice-*.md)") \
+  --base main \
+  --head phase/N-<theme>
+```
+
+**Otherwise** (no `gh`), print the GitHub compare URL the human can open:
+
+```
+https://github.com/<owner>/<repo>/compare/main...phase/N-<theme>?quick_pull=1&title=phase%28N%29%3A%20<URL-encoded title>
+```
+
+(Owner/repo is read from `git remote get-url origin` if available; otherwise leave `<owner>/<repo>` for the human to fill in.)
+
+`/merge-phase` only supports GitHub for v1.2. GitLab/Bitbucket support is a v1.3+ candidate.
+
+## Update state
+
+After printing commands / URL:
+
+- `Stage: blocked`
+- `Blocked Kind: awaiting-merge-approval`
+- `Blocked Reason: "Phase N merge prepared (mode: <cli|pr>). Run the printed commands; resume with /resume after merge lands on origin/main."`
+- `Next Prompt: n/a` (the next prompt is `/resume`, but it's the human's call when to run it — set on `/resume` itself, not pre-set here).
+
+Append to `## Context` in `CURRENT-STATE.md`:
+`[ISO8601] /merge-phase: phase N prepared (mode: <cli|pr>); awaiting human merge.`
+
+## Rules
+
+- **Do not run the merge commands yourself.** Print only.
+- **Do not push to main.** The human pushes.
+- **Do not increment `Phase`.** That's `/resume`'s job after the merge is verified on `origin/main`.
+- **Do not deactivate catalog items, delete branches, or alter ADRs.** Cleanup work happened during `Stage: cleanup`; this prompt is about the merge handshake only.
+- **Refuse, do not work around.** If a precondition fails (dirty tree, failing review, doc-sync gap, wrong branch, missing Merge Mode), state the reason and stop. Do not attempt to fix the precondition silently.

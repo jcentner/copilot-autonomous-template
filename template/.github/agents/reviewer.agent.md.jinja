@@ -39,9 +39,13 @@ Consult on demand via Explore: ADRs, architecture overview, glossary.
 5. **Dependency security** — known vulnerabilities in new deps? outdated packages?
 6. **Doc-sync** — run the checklist below for any slice that adds/changes user-visible capability.
 
-## Doc-sync checklist
+## Doc-sync checklist (two-tier severity)
 
-Flag each stale item as a **Major** finding.
+**Per-slice review (this invocation): doc-sync findings are *warnings*, not blockers.** Tag each stale item with `doc-sync: missing` in the Findings table and surface it explicitly, but do **not** count toward Critical/Major totals — a slice should not fail review for an out-of-date glossary entry.
+
+**Merge gate (`/merge-phase`): doc-sync findings ARE blockers.** The merge prompt scans every `roadmap/phases/phase-N-review-slice-*.md` in the phase for un-resolved `doc-sync: missing` strings and refuses to advance until they are cleared. So: flag them now, fix them before the merge gate.
+
+Run the checklist below for any slice that adds/changes user-visible capability.
 
 1. **Vision lock accurate?** Does shipped scope exceed `VISION-LOCK.md`?
 2. **Architecture overview accurate?** Does component description match reality?
@@ -49,6 +53,10 @@ Flag each stale item as a **Major** finding.
 4. **Open questions stale?** Resolved OQs still marked "open" or "deferred"?
 5. **Tech debt stale?** Resolved TDs still listed? New compromises untracked?
 6. **Glossary complete?** New terms defined?
+7. **CHANGELOG entry written?** User-visible behavior changes documented under the next version's section?
+8. **ADR written for new architectural decisions?** New trade-offs captured in `docs/architecture/decisions/`?
+9. **Wraps entry deferred to phase-complete?** OK to defer; flag here so it's not forgotten.
+10. **Instructions / skills updated for behavior change?** If a stack skill claims behavior X and the slice changed it, update the skill.
 
 ## Output artifact
 
@@ -57,24 +65,28 @@ Write findings to `roadmap/phases/phase-N-review-slice-M.md` (N = Phase, M = Act
 ```markdown
 ## Findings
 
-| Severity | File | Finding | Recommendation |
-|----------|------|---------|----------------|
-| Critical | path:line | description | fix |
-| Major | path:line | description | fix |
-| Minor | path:line | description | fix |
-| Nit | path:line | description | fix |
+| Severity | Tag | File | Finding | Recommendation |
+|----------|-----|------|---------|----------------|
+| Critical |     | path:line | description | fix |
+| Major    |     | path:line | description | fix |
+| Major    | doc-sync: missing | docs/x.md | description | fix before /merge-phase |
+| Minor    |     | path:line | description | fix |
+| Nit      |     | path:line | description | fix |
 
 ## Verdict
 
 Review Verdict: pass | needs-fixes | needs-rework
 Critical Findings: <count>
-Major Findings: <count>
+Major Findings: <count of NON-doc-sync majors only>
+Doc-sync Findings: <count of `doc-sync: missing` rows>
 ```
 
 Verdict meaning:
-- `pass` — zero Critical, zero Major. Minor/Nit items are non-blocking.
-- `needs-fixes` — Majors present; builder must fix and re-invoke (or the re-review scope is small enough to handle inline).
+- `pass` — zero Critical, zero non-doc-sync Major. Doc-sync, Minor, Nit items are non-blocking at slice level (doc-sync blocks at the merge gate).
+- `needs-fixes` — non-doc-sync Majors present; builder must fix and re-invoke (or the re-review scope is small enough to handle inline).
 - `needs-rework` — Criticals present, or systemic problems. Slice must be reworked, not patched.
+
+Note: `doc-sync: missing` rows do NOT contribute to `Critical Findings` or `Major Findings` counters. `/merge-phase` does its own scan for the literal `doc-sync: missing` string across all slice review files in the phase — leaving them unfixed will block the merge gate.
 
 ## State updates (required before you return)
 
