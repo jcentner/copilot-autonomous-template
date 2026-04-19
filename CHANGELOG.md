@@ -124,6 +124,20 @@ for the design rationale.
   - `/merge-phase` only supports GitHub for v1.2 (CLI or PR via `gh` /
     compare URL). GitLab / Bitbucket are v1.3+ candidates.
 
+### Fixed
+- **`subagent-verdict-check.py` SubagentStop output schema.** Previously
+  the hook emitted `{"hookSpecificOutput": {"hookEventName":
+  "SubagentStop", "decision": "block", "reason": ...}}` (the Stop hook
+  shape). VS Code's hooks docs specify SubagentStop output is **top-level**
+  `{"decision": "block", "reason": ...}`, with no `hookSpecificOutput`
+  wrapper — VS Code silently ignored the wrapped form, meaning the
+  critic / product-owner / reviewer / planner SubagentStop verifiers
+  never actually blocked. Latent since v1.0.0; v1.2 makes the verifier
+  load-bearing (researcher is now core; ADR-011 hangs the design on
+  "agents write state, hooks verify state wrote"), so shipping the bug
+  forward would be enforcement theatre per ADR-010. Test helpers and
+  smoke assertions updated to match.
+
 ## [1.1.0] — 2026-04-17
 
 Backward-compatible additions on top of v1.0.0.

@@ -27,7 +27,9 @@ def run_verdict_hook(subagent, payload, cwd):
 
 
 def is_block(parsed):
-    return parsed.get("hookSpecificOutput", {}).get("decision") == "block"
+    # SubagentStop output is top-level {decision, reason} per VS Code
+    # Copilot hooks docs (NOT wrapped in hookSpecificOutput like Stop).
+    return parsed.get("decision") == "block"
 
 
 class CriticVerdictTests(unittest.TestCase):
@@ -420,7 +422,7 @@ class PhaseCoercionTests(unittest.TestCase):
         self._corrupt_phase("Phase 1")
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertTrue(is_block(out))
-        self.assertIn("Phase", out["hookSpecificOutput"]["reason"])
+        self.assertIn("Phase", out["reason"])
 
     def test_float_phase_blocks_critic(self):
         make_state(self.tmp, stage="design-critique", design_status="approved")
@@ -453,7 +455,7 @@ class PhaseCoercionTests(unittest.TestCase):
         self._corrupt_phase("0")
         rc, out, _ = run_verdict_hook("critic", {"cwd": str(self.tmp)}, self.tmp)
         self.assertTrue(is_block(out))
-        self.assertIn("Phase", out["hookSpecificOutput"]["reason"])
+        self.assertIn("Phase", out["reason"])
 
     def test_phase_zero_blocks_reviewer_in_executing(self):
         make_state(

@@ -256,6 +256,8 @@ out=$(echo '{"sessionId":"smoke-test","tool_response":"small"}' \
 
 echo "==> subagent-verdict-check: reviewer with incomplete state → block"
 # Reset to executing stage with reviewer not invoked.
+# SubagentStop output is top-level {decision, reason} per VS Code Copilot
+# hooks docs (NOT wrapped in hookSpecificOutput like Stop hooks).
 cp "$TMP/roadmap/state.md.bak" "$TMP/roadmap/state.md"
 sed -i 's/\*\*Stage\*\*: bootstrap/\*\*Stage\*\*: executing/' "$TMP/roadmap/state.md"
 out=$(echo '{"cwd":"'"$TMP"'"}' \
@@ -264,7 +266,7 @@ echo "$out" | python3 -c "
 import json, sys
 raw = sys.stdin.read().strip() or '{}'
 d = json.loads(raw)
-assert d.get('hookSpecificOutput', {}).get('decision') == 'block', d
+assert d.get('decision') == 'block', d
 "
 
 echo "==> tester-isolation: semantic_search → deny"

@@ -11,12 +11,11 @@ Usage:
 
 Where <subagent-name> is one of: critic | product-owner | reviewer.
 
-Return schema (per Copilot hooks docs):
-    {"hookSpecificOutput": {
-        "hookEventName": "SubagentStop",
-        "decision": "block",
-        "reason": "..."
-    }}
+Return schema (per VS Code Copilot hooks docs, SubagentStop section):
+    {"decision": "block", "reason": "..."}
+    Top-level — NOT wrapped in hookSpecificOutput. (Stop hook uses the
+    wrapped form; SubagentStop intentionally does not. See
+    https://code.visualstudio.com/docs/copilot/customization/hooks)
 Empty object on allow.
 """
 import json
@@ -34,16 +33,7 @@ TERMINAL_STRATEGIC = {"pass", "replan", "n/a"}
 
 
 def block(reason):
-    json.dump(
-        {
-            "hookSpecificOutput": {
-                "hookEventName": "SubagentStop",
-                "decision": "block",
-                "reason": reason,
-            }
-        },
-        sys.stdout,
-    )
+    json.dump({"decision": "block", "reason": reason}, sys.stdout)
 
 
 def allow():
