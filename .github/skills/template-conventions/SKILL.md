@@ -55,10 +55,10 @@ Required: `description`. Common optional fields: `tools`, `agents` (subagent all
 
 ### Prompts (`*.prompt.md` / `*.prompt.md.jinja`)
 
-- Frontmatter: `description`, optionally `agent` (defaults to active agent).
+- Frontmatter: `description`, optionally `agent`. **Omit `agent:` to inherit the active agent (e.g. `autonomous-builder`).** Per the [Copilot prompt-files docs](https://code.visualstudio.com/docs/copilot/customization/prompt-files), the value `agent: agent` is **not** "any agent" — it explicitly forces default Agent mode and bumps the user out of their selected custom agent. Only set `agent:` when the prompt must dispatch to a specific subagent (e.g. `agent: planner`, `agent: reviewer`, `agent: product-owner`).
 - Use `${input:varName:default}` for runtime input.
 - Markdown links in the body auto-attach files as context — prefer linking to shared docs over duplicating content.
-- Don't add a `tools` list unless the prompt must restrict capability beyond the agent it dispatches to.
+- Don't add a `tools` list unless the prompt must restrict capability beyond the agent it dispatches to. (Specifying `tools:` also forces `agent: agent` per the docs — another reason to avoid it.)
 
 ### Instructions (`*.instructions.md`)
 

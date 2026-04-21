@@ -38,19 +38,21 @@ For fully autonomous sessions, enable these VS Code settings:
 
 Prompts are **human override entry points**. The autonomous builder orchestrates the full pipeline; you invoke prompts directly only when driving a single step manually or recovering from an interrupted run. Type `/` in Chat to invoke.
 
+Prompts without a dedicated subagent in the **Agent** column **inherit the currently selected agent** (typically `autonomous-builder`). Only `/design-plan`, `/implementation-plan`, `/code-review`, and `/strategic-review` dispatch to a specific subagent.
+
 | Prompt | What it does | Stage it fits | Agent |
 |--------|--------------|---------------|-------|
-| `/strategize` | Pick the next phase from grounded candidates; writes `roadmap/strategy-YYYYMMDD-HHMMSSZ.md`; flips to `planning` on approval or to `blocked` (`awaiting-strategy-approval`) on escape | `strategy` | agent |
-| `/research` | Dispatch the researcher subagent on a topic; produces `docs/reference/<topic>.md` with cited public sources | any (side-quest) | researcher |
-| `/vision-expand` | Brainstorm next directions after current vision is fulfilled | `complete` / post-vision | agent |
+| `/strategize` | Pick the next phase from grounded candidates; writes `roadmap/strategy-YYYYMMDD-HHMMSSZ.md`; flips to `planning` on approval or to `blocked` (`awaiting-strategy-approval`) on escape | `strategy` | *(inherits)* |
+| `/research` | Dispatch the researcher subagent on a topic; produces `docs/reference/<topic>.md` with cited public sources | any (side-quest) | *(inherits)* |
+| `/vision-expand` | Brainstorm next directions after current vision is fulfilled | `complete` / post-vision | *(inherits)* |
 | `/design-plan` | Produce user stories, acceptance criteria, non-goals, risks, ADR candidates, test strategy, slice breakdown | `planning` | planner |
 | `/implementation-plan` | Convert an approved design into a file-by-file slice plan | `implementation-planning` | planner |
-| `/implement` | Execute one slice of the approved implementation plan via the slice loop | `executing` | agent |
+| `/implement` | Execute one slice of the approved implementation plan via the slice loop | `executing` | *(inherits)* |
 | `/code-review` | Per-slice code review: architecture, quality, tests, docs-sync (warning), security | `executing` (per slice) | reviewer |
-| `/strategic-review` | Phase-level strategic review ("did we build the right thing?") | `reviewing` | product-owner / planner |
-| `/phase-complete` | Cleanup checklist: ADRs, docs, wrap summary, advance state machine | `cleanup` | agent |
-| `/merge-phase` | Prepare phase merge per `Merge Mode` (`cli` prints commands; `pr` prints `gh` invocation or compare URL); flips to `blocked` (`awaiting-merge-approval`); never executes the merge | `cleanup` → merge gate | agent |
-| `/resume` | Unblock a session by routing on `Blocked Kind` (strategy / design / merge approval, vision update, scrap, error) | `blocked` | (root) |
+| `/strategic-review` | Phase-level strategic review ("did we build the right thing?") | `reviewing` | product-owner |
+| `/phase-complete` | Cleanup checklist: ADRs, docs, wrap summary, advance state machine | `cleanup` | *(inherits)* |
+| `/merge-phase` | Prepare phase merge per `Merge Mode` (`cli` prints commands; `pr` prints `gh` invocation or compare URL); flips to `blocked` (`awaiting-merge-approval`); never executes the merge | `cleanup` → merge gate | *(inherits)* |
+| `/resume` | Unblock a session by routing on `Blocked Kind` (strategy / design / merge approval, vision update, scrap, error) | `blocked` | *(inherits)* |
 
 Each prompt reads and writes machine-readable fields in `roadmap/state.md`. SubagentStop and PreToolUse hooks verify that writes happened correctly.
 
