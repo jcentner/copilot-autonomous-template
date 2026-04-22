@@ -66,6 +66,7 @@ VALID_NEXT_PROMPTS = {
     "/implementation-plan",
     "/implement",
     "/code-review",
+    "/strategic-review",
     "/merge-phase",
     "/resume",
     "/scrap-phase",

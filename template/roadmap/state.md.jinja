@@ -34,8 +34,9 @@
   Next Prompt vocabulary (the slash-command the human / orchestrator should
   run next; rendered by session-gate.py at every Stop):
     n/a | /strategize | /design-plan | /implementation-plan | /implement |
-    /code-review | /merge-phase | /resume | /scrap-phase | /vision-expand |
-    /catalog-review | /research | /phase-complete
+    /code-review | /strategic-review | /merge-phase | /resume |
+    /scrap-phase | /vision-expand | /catalog-review | /research |
+    /phase-complete
 
   Merge Mode vocabulary (how phase branches are merged back to main; picked
   at bootstrap, edit here to change later):
@@ -47,7 +48,7 @@
 - **Stage**: bootstrap
 - **Blocked Kind**: n/a
 - **Phase**: 0
-- **Phase Title**: Bootstrap
+- **Phase Title**: Strategy Pending
 - **Source Root**: src/
 - **Test Path Globs**: **/test/**, **/tests/**, **/test_*, **/*_test.*, **/*.test.*, **/*.spec.*, **/__tests__/**, **/__test__/**, **/spec/**, **/specs/**
 - **Config File Globs**: package.json, tsconfig.json, tsconfig*.json, pyproject.toml, setup.cfg, setup.py, Cargo.toml, go.mod, pnpm-workspace.yaml, yarn.lock, pnpm-lock.yaml, package-lock.json, jest.config.*, vitest.config.*, pytest.ini, tox.ini, karma.conf.*, mocha.opts, .mocharc.*, conftest.py, *.config.*, *.config

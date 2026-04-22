@@ -10,11 +10,12 @@ hooks:
   SubagentStop:
     - type: command
       command: "python3 .github/hooks/scripts/subagent-verdict-check.py product-owner"
-handoffs:
-  - label: Hand off to Critic
-    agent: critic
-    prompt: "Critique the design plan including the user stories above."
-    send: false
+# No handoffs: the product-owner is invoked as a subagent by the
+# autonomous-builder, which dispatches the critic at the right Stage
+# (`design-critique`). A handoff to critic from `Stage: reviewing`
+# (review mode) would silently degrade `subagent-verdict-check.py critic`,
+# which only enforces the verdict-trailer requirement during the
+# critique stages.
 ---
 
 # Product Owner — {{ project_name }}
@@ -115,6 +116,7 @@ Emit one of these verdicts at the end:
 ### State updates (required before you return)
 
 - Set `Strategic Review` field in state.md to `pass`, `replan`, or `n/a` (never leave at `pending`).
+- On `replan` only, also set the full block transition so `/resume` can route the next session (the `/strategic-review` prompt's "Update CURRENT-STATE" section enumerates these): `Stage: blocked`, `Blocked Kind: awaiting-human-decision`, `Blocked Reason: "<one-line summary of why a replan is needed>"`, `Next Prompt: /resume`. Do not defer this to "the builder" — `session-gate` only blocks stop on `Strategic Review: pending`, so without these writes the agent could stop at `Stage: reviewing` with `replan` and no `/resume` cue surfaced to the human.
 
 ---
 

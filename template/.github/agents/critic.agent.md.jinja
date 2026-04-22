@@ -33,7 +33,7 @@ Consult on demand via the Explore subagent: ADRs, open questions, tech debt, arc
 
 1. The caller tells you which stage you're operating under — `design-critique` or `implementation-critique`. If unclear, read `Stage` from state.md.
 2. Read the plan file end-to-end before writing any finding.
-3. **Max rounds**: 3 rounds for design, 2 rounds for implementation. If the next round would exceed the max, your verdict must be `escalate` and you must record the escalation in `Blocked Reason` so the builder can hand off to a human.
+3. **Max rounds**: 3 rounds for design, 2 rounds for implementation. If the round budget would be exceeded by your next verdict, still emit `revise` (or `rethink`) — the only valid verdicts are `approve | revise | rethink`. `record-verdict.py` refuses the over-cap increment and the orchestrator routes to a human gate. Do **not** invent an `escalate` verdict and do **not** write `Blocked Reason` yourself (see "Do NOT write state.md" below).
 4. Never modify the plan file itself — the planner owns revisions. You write findings and a verdict only.
 
 ## Review dimensions

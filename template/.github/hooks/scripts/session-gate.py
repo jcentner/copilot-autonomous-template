@@ -182,9 +182,20 @@ def main():
         )
         return
 
-    # `complete` allows stop unconditionally — vision exhausted.
+    # `complete` is a transient stage — the autonomous-builder's stage table
+    # mandates flipping to `Stage: blocked` + `Blocked Kind: vision-exhausted`
+    # + `Next Prompt: /vision-expand` before stop. Without this guard, an
+    # agent that forgets the second-step flip silently dead-ends the workflow
+    # (no Blocked Kind, no Next Prompt nudge, no resume routing).
     if stage == "complete":
-        allow(fields, cwd)
+        block(
+            "Stage is 'complete'. Flip to Stage: blocked + Blocked Kind: "
+            "vision-exhausted + Next Prompt: /vision-expand before stopping "
+            "so /resume can route the next session. See the autonomous-builder "
+            "stage table for the 'complete' row.",
+            fields,
+            cwd,
+        )
         return
 
     # `blocked` allows stop only when Blocked Kind is set to a valid value.
@@ -263,6 +274,15 @@ def main():
         tests_pass = get(fields, "tests pass")
         if tests_pass in INCOMPLETE_SLICE_VALUES:
             reasons.append(f"Tests Pass is '{tests_pass}' (need 'yes' or 'n/a')")
+
+        # Tests Written: paired with Tests Pass and written by the same helper.
+        # If the agent reset Tests Written: pending for the next slice but
+        # forgot to invoke the tester, this catches the omission before stop.
+        tests_written = get(fields, "tests written")
+        if tests_written in INCOMPLETE_SLICE_VALUES:
+            reasons.append(
+                f"Tests Written is '{tests_written}' (need 'yes' or 'n/a')"
+            )
 
         reviewer_invoked = get(fields, "reviewer invoked")
         if reviewer_invoked in INCOMPLETE_SLICE_VALUES:

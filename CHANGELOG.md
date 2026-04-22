@@ -6,6 +6,95 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] — 2026-04-22
+
+Patch release. Fixes workflow contradictions discovered while running v1.2.0
+in a real project (the `executing → reviewing` transition cued the wrong
+slash-command, which led to a full audit of every stage transition,
+resume-routing branch, and subagent handoff). No state.md schema changes;
+no new stages, blocked kinds, or hooks. Generated repos can pull this via
+`copier update` without migration steps.
+
+### Fixed — Stage routing
+- **`executing → reviewing`** now writes `Next Prompt: /strategic-review`
+  (was `/code-review`, which dispatched the per-slice reviewer that had
+  already run on every slice). `/strategic-review` added to
+  `VALID_NEXT_PROMPTS` (was missing entirely, so any agent writing the
+  correct value would have been rejected by the validator).
+- **`/resume awaiting-design-approval`** Approve and Revise branches now
+  set `Next Prompt` (`/implementation-plan` and `/design-plan`
+  respectively). Previously left the stale `/resume` cue from
+  `record-verdict.py`, looping the human back into the resume prompt
+  whose precondition then refused.
+- **`/vision-expand`** now routes through `Stage: strategy` +
+  `Next Prompt: /strategize` instead of jumping straight to `planning`,
+  so the new vision's first phase actually goes through the strategy
+  approval gate and gets a proper `Phase Title`.
+- **`/scrap-phase`** now writes `Next Prompt: /resume` (was
+  `/strategize`), matching every other blocked-exit path.
+- **`/merge-phase`** now writes `Next Prompt: /resume` (was `n/a`), so
+  the Stop hook surfaces the next slash-command instead of leaving the
+  human to find it from `stage-recommendations`.
+- **`/strategize` Phase E** now checks out `main` first if currently on
+  a `phase/*` branch, preventing scrapped commits from being carried
+  into the next phase branch when the post-scrap path runs through
+  `/resume → /strategize`.
+
+### Fixed — Critic agent contract
+- Removed the invalid `escalate` verdict from the critic agent doc
+  (only `approve | revise | rethink` are accepted by `record-verdict.py`
+  and `subagent-verdict-check.py`). Removed the contradictory
+  instruction telling the critic to write `Blocked Reason` directly
+  while the same file's "Do NOT write state.md" section forbade it.
+  Over-cap escalation continues to flow through `record-verdict.py`'s
+  refusal of the increment.
+
+### Fixed — Sole-writer principle (ADR-003)
+- Slice-loop step 8 in the autonomous-builder agent and step 9 in
+  `/implement` now tell the orchestrator to **verify** the reviewer
+  wrote `Reviewer Invoked / Review Verdict / Critical Findings /
+  Major Findings`, not overwrite them. Reviewer remains the sole
+  writer per ADR-003.
+- Removed `handoffs:` blocks from the planner and product-owner agents.
+  Both routed to the critic from a stage where
+  `subagent-verdict-check.py critic` does not enforce the
+  verdict-trailer requirement, silently degrading the critique gate.
+- Strategic review `replan` verdict now sets the full block transition
+  (`Stage: blocked`, `Blocked Kind: awaiting-human-decision`,
+  `Blocked Reason`, `Next Prompt: /resume`) inside `/strategic-review`
+  and the product-owner agent doc, instead of deferring to "the builder."
+  `session-gate` only blocks stop on `Strategic Review: pending`, so the
+  prior approach allowed stop at `Stage: reviewing` with no resume cue.
+
+### Fixed — Schema and field discipline
+- Initial `Phase Title` shipped in `state.md.jinja` is now
+  `Strategy Pending` (was `Bootstrap`), matching the autonomous-builder's
+  `Phase` value rules.
+- `Slice Total` is now written by `/implementation-plan` and the planner
+  agent's `implementation-planning` responsibilities. Previously stayed
+  `n/a` permanently despite being in the schema and the reviewer's
+  required reads.
+- `/implement` prompt now pins `agent: autonomous-builder`. Without the
+  pin, running `/implement` from a non-builder agent silently lacked
+  the slice loop's subagent and hook wiring.
+- Tester agent dropped `search/codebase` from `tools:` —
+  `tester-isolation.py` denies it unconditionally; advertising it
+  invited futile attempts.
+
+### Hardened — Stop hook
+- `Stage: complete` no longer allows stop unconditionally. The
+  autonomous-builder's stage table mandates flipping to
+  `Stage: blocked` + `Blocked Kind: vision-exhausted` +
+  `Next Prompt: /vision-expand`; `session-gate.py` now enforces the
+  flip so a forgetful agent can't silently dead-end the workflow.
+- `executing` stop now also checks `Tests Written` (in addition to
+  `Tests Pass`), closing the gap where the field was reset/written
+  by helpers but never gated.
+
+### Docs / cosmetic
+- Promoted "Browser tools" subsection in `copilot-instructions.md.jinja`
+  from "(optional)" to "(preferred)".
+
 ## [1.2.0] — 2026-04-19
 
 Additive on top of v1.1.0. No breaking changes; all v1.1 state.md fields and

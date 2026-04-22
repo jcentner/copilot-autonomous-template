@@ -101,12 +101,14 @@ waiting for you to approve the design before implementation planning begins.
    - Set `Stage: implementation-planning`.
    - Set `Blocked Kind: n/a`.
    - Clear `Blocked Reason: n/a`.
+   - Set `Next Prompt: /implementation-plan` (otherwise the stale `/resume` cue from the design-approval transition would loop the human back here).
    - Append to `## Context` in `CURRENT-STATE.md`: `[ISO8601] resume: design approved by human, advancing to implementation-planning`.
 
 4. On **Revise**:
    - Set `Stage: design-critique`.
    - Set `Design Status: revise`.
    - Set `Blocked Kind: n/a`.
+   - Set `Next Prompt: /design-plan` (mirrors `record-verdict.py`'s revise mutation).
    - Record human feedback in `Blocked Reason` (will be cleared by next planner pass) or directly in the design plan.
 
 5. On **Abandon**:

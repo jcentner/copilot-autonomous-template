@@ -2,9 +2,12 @@
 description: "Test-from-spec agent — writes tests from requirements before seeing implementation code. Isolation from source is enforced by a PreToolUse hook."
 tools:
   - search
-  - search/codebase
   - edit
   - web
+# `search/codebase` (semantic search) is intentionally omitted: tester-isolation.py
+# denies it unconditionally because semantic results return source content
+# and there is no way to path-gate them after the fact. Use `grep_search` /
+# `file_search` with explicit `includePattern` instead.
 user-invocable: false
 hooks:
   PreToolUse:

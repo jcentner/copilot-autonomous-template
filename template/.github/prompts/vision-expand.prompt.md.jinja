@@ -99,15 +99,16 @@ The new vision should build on what exists, not pretend the project is starting 
 ### 3. Advance the state machine
 
 Update `roadmap/state.md`:
-- **Stage**: `planning` (the next session's planner will produce `phase-N+1-design.md`)
+- **Stage**: `strategy` (route the new vision through `/strategize` so the next phase actually picks a title and Phase number per the strategy gate — jumping straight to `planning` would silently skip strategy approval and leave `Phase Title` stale).
+- **Next Prompt**: `/strategize`.
 - Clear `Design Plan`, `Implementation Plan`, set `Design Status: n/a`, `Implementation Status: n/a`.
 - Reset `Blocked Kind: n/a`, `Blocked Reason: n/a` (vision-update has been resolved).
 - **Phase increment depends on arrival path:**
-  - From `Blocked Kind: vision-exhausted`: Phase was already incremented by `phase-complete.prompt.md`. **Do not increment again** — leave Phase as-is.
-  - From `Blocked Kind: awaiting-vision-update` (mid-phase pivot): the in-flight phase is being abandoned because its premise is invalid. **Treat the pivot as a phase boundary**: increment `Phase` by 1, clear `Phase Title`, reset Slice Evidence (`Evidence For Slice`, `Tests Written`, `Tests Pass`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings: 0`, `Major Findings: 0`, `Strategic Review`, `Committed` → `n/a` / `pending`), reset `Active Slice: 1`, `Slice Total: n/a`, `Design Critique Rounds: 0`, `Implementation Critique Rounds: 0`. This avoids the next planner overwriting the abandoned `phase-N-design.md`.
+  - From `Blocked Kind: vision-exhausted`: Phase was already incremented by `/resume` post-merge before the `complete` stage was reached. **Do not increment again** — `/strategize`'s `Phase` value rules will see the already-bumped number and leave it alone.
+  - From `Blocked Kind: awaiting-vision-update` (mid-phase pivot): the in-flight phase is being abandoned because its premise is invalid. **Treat the pivot as a phase boundary**: increment `Phase` by 1, clear `Phase Title`, reset Slice Evidence (`Evidence For Slice`, `Tests Written`, `Tests Pass`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings: 0`, `Major Findings: 0`, `Strategic Review`, `Committed` → `n/a` / `pending`), reset `Active Slice: n/a`, `Slice Total: n/a`, `Design Critique Rounds: 0`, `Implementation Critique Rounds: 0`. This avoids the next planner overwriting the abandoned `phase-N-design.md`.
   - In both cases, also write a one-line note to `## Vision Pivots` in `CURRENT-STATE.md` recording the abandoned phase number and the reason, so the audit trail isn't lost when the design plan filename moves on.
 
-Do **not** create a phase plan inline — that is the planner's job on the next session once Stage is `planning`.
+Do **not** create a phase plan inline — that is the planner's job after `/strategize` picks the next phase and advances Stage to `planning`.
 
 ### 4. Catalog re-evaluation
 

@@ -85,8 +85,8 @@ Read `Stage` from state.md and execute the matching protocol. **Every stage tran
 | `design-critique` | Invoke **product-owner** (user stories) then **critic** (adversarial review). After critic returns, run `python3 .github/hooks/scripts/record-verdict.py design R<n>` (Block 3) — do NOT eyeball the artifact or mutate `Design Critique Rounds` yourself. The verdict script handles `approve` / `revise` / `rethink` mutations. On `approve`, the script sets `Stage: blocked`, `Blocked Kind: awaiting-design-approval`, `Next Prompt: /resume` and you stop. |
 | `implementation-planning` | Invoke **planner** for `roadmap/phases/phase-N-implementation.md`. Optionally invoke **tester** to review the test strategy. Self-approve and append to `## Context` in CURRENT-STATE.md (autopilot) or ask human (manual mode). Set `Stage: implementation-critique`, `Next Prompt: n/a`. |
 | `implementation-critique` | Invoke **critic** against the implementation plan (max 2 rounds). After critic returns, run `record-verdict.py impl R<n>`. On `approve`, the script sets `Stage: executing`, `Active Slice: 1`, `Next Prompt: /implement`. |
-| `executing` | Run the **slice loop** below for each slice. After final slice, set `Stage: reviewing`, `Next Prompt: /code-review`. |
-| `reviewing` | Invoke **product-owner** for strategic review (validates implementation against design intent). Per-slice code review already happened during executing — do NOT re-invoke the reviewer here. Set `Stage: cleanup`, `Next Prompt: /phase-complete`. |
+| `executing` | Run the **slice loop** below for each slice. After final slice, set `Stage: reviewing`, `Next Prompt: /strategic-review`. |
+| `reviewing` | Run `/strategic-review`, which dispatches the **product-owner** subagent to validate the implementation against design intent. Per-slice code review already happened during executing — do NOT re-invoke the reviewer here. Set `Stage: cleanup`, `Next Prompt: /phase-complete`. |
 | `cleanup` | Run `/phase-complete`. Finish the Phase Completion Checklist. On success, **do NOT increment `Phase` or reset Slice Evidence here** — those happen in `/resume` post-merge. Set `Stage: blocked`, `Blocked Kind: awaiting-merge-approval`, `Next Prompt: /merge-phase`. |
 | `blocked` | Stop immediately. Never resume from `blocked` without `/resume` and explicit human intent. The session-gate hook requires `Blocked Kind` to be set before allowing stop. |
 | `complete` | Vision is exhausted. Set `Blocked Kind: vision-exhausted`, `Blocked Reason: "Run /vision-expand to propose next directions."`, `Stage: blocked`, `Next Prompt: /vision-expand`. Stop. |
@@ -138,7 +138,7 @@ For each slice in the implementation plan:
 5. Invoke **reviewer** on changed files. The reviewer writes Review Verdict + findings to state.md.
 6. Fix all Critical and Major findings.
 7. `git commit` with format `type(scope): description`, then **stamp commit evidence** with `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty — do not bypass it by editing state.md directly.
-8. Update remaining Slice Evidence in state.md: `Reviewer Invoked`, `Review Verdict`, `Critical Findings`, `Major Findings` (the helper above wrote `Committed`). Increment `Active Slice` and **reset slice evidence fields** to `pending` (Tests Written, Tests Pass, Reviewer Invoked, Review Verdict, Critical Findings = 0, Major Findings = 0, Committed) so the next slice starts with a clean slate.
+8. Update remaining Slice Evidence in state.md. **Verify** the reviewer wrote `Reviewer Invoked: yes`, `Review Verdict`, `Critical Findings`, `Major Findings` — the reviewer is the sole writer per ADR-003, and `subagent-verdict-check.py reviewer` would have blocked otherwise. Do not overwrite those values; if they look wrong, re-invoke the reviewer rather than edit by hand. The `write-commit-evidence.py` helper wrote `Committed`. Then increment `Active Slice` and **reset slice evidence fields** to `pending` (Tests Written, Tests Pass, Reviewer Invoked, Review Verdict, Critical Findings = 0, Major Findings = 0, Committed) so the next slice starts with a clean slate.
 
 The Stop hook (`session-gate.py`) blocks session end if Slice Evidence is incomplete during `executing`.
 
@@ -167,7 +167,7 @@ If a required tool is missing (linter, service, hardware access):
 - **tester** — writes tests from spec without reading implementation. Isolation hook-enforced.
 - **researcher** — web research, comparative analysis, durable reference docs at `docs/reference/<topic>.md`. NO terminal access (anti-injection). Inherits standard hook set. Invoked via `/research <topic>` or directly when strategize / design-critique flags an external system without grounding.
 - **Explore** — broad read-only searches without polluting main context.
-- **designer**, **security-reviewer** — catalog agents. Only available if activated at bootstrap. Listed here so the picker works post-activation.
+- **designer**, **security-reviewer** — catalog agents. Only available if activated at bootstrap. Listed here so the picker works post-activation. **Use `designer` (or the `/design-review` prompt) for any browser walkthrough** — those declare `browser` in their `tools:` list and bypass the virtual-tools loader. Do not try to drive `open_browser_page` / `screenshot_page` / `click_element` directly from this agent; those tools are virtualized here and may be unreachable even when `workbench.browser.enableChatTools` is true. See the "Browser tools" section in `copilot-instructions.md` for the full mechanism.
 
 ## Execution model
 

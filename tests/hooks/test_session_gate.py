@@ -53,8 +53,15 @@ class SessionGateTests(unittest.TestCase):
                 out = self._run(stage="blocked", blocked_kind=kind)
                 self.assertEqual(self._decision(out), "allow")
 
-    def test_complete_stage_allows_stop(self):
+    def test_complete_stage_blocks_until_flipped(self):
+        # `complete` is a transient stage; the agent must flip to
+        # blocked + vision-exhausted + Next Prompt before stop.
         out = self._run(stage="complete")
+        self.assertEqual(self._decision(out), "block")
+        self.assertIn("vision-exhausted", out["hookSpecificOutput"]["reason"])
+
+    def test_blocked_vision_exhausted_allows_stop(self):
+        out = self._run(stage="blocked", blocked_kind="vision-exhausted")
         self.assertEqual(self._decision(out), "allow")
 
     def test_executing_with_complete_slice_allows(self):
@@ -94,6 +101,11 @@ class SessionGateTests(unittest.TestCase):
         out = self._run(stage="executing", tests_pass="no")
         self.assertEqual(self._decision(out), "block")
         self.assertIn("Tests Pass", out["hookSpecificOutput"]["reason"])
+
+    def test_executing_blocks_on_pending_tests_written(self):
+        out = self._run(stage="executing", tests_written="pending")
+        self.assertEqual(self._decision(out), "block")
+        self.assertIn("Tests Written", out["hookSpecificOutput"]["reason"])
 
     def test_executing_blocks_on_pending_review(self):
         out = self._run(stage="executing", review_verdict="pending")

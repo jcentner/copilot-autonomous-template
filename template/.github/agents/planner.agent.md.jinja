@@ -9,15 +9,12 @@ hooks:
   SubagentStop:
     - type: command
       command: "python3 .github/hooks/scripts/subagent-verdict-check.py planner"
-handoffs:
-  - label: Hand off to Critic
-    agent: critic
-    prompt: "Critique the plan I just wrote."
-    send: false
-  - label: Hand off to Product Owner
-    agent: product-owner
-    prompt: "Write user stories and acceptance criteria for this design plan."
-    send: false
+# No handoffs: the planner is invoked as a subagent by the autonomous-builder,
+# which itself dispatches the critic and product-owner at the right Stage
+# (`design-critique` / `implementation-critique`). Adding handoff buttons here
+# would let a human run the critic from `Stage: planning`, where
+# `subagent-verdict-check.py critic` does not enforce the verdict-trailer
+# requirement — silently degrading the critique gate.
 ---
 
 # Planner — {{ project_name }}
@@ -72,6 +69,7 @@ Do **not** start implementation planning unless `Design Status` is `approved` or
 After writing:
 - Set `Implementation Plan` field in `state.md` to the file path.
 - Set `Implementation Status` to `draft`.
+- **Set `Slice Total` to the number of slices in the plan.** The reviewer agent reads this on every invocation; the field is shipped as `n/a` and only the implementation-planning step is positioned to count slices accurately.
 
 ### `implementation-critique` — revise implementation plan after critique
 

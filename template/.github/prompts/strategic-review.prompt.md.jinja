@@ -72,7 +72,12 @@ Verdict rules:
 
 Set **Strategic Review** in `roadmap/state.md` to `pass`, `replan`, or `n/a` (the SubagentStop hook verifies this terminal value).
 
-If verdict is `replan`, set **Blocked Reason** to summarize the replan and **Blocked Kind** to `awaiting-human-decision`, then let the builder transition to `blocked` for human review.
+If verdict is `replan`, set the full block transition yourself — do not defer to "the builder." `session-gate` only blocks stop on `Strategic Review: pending`, so without these writes the agent could stop at `Stage: reviewing` with `replan` and no `/resume` cue surfaced to the human:
+
+- `Stage: blocked`
+- `Blocked Kind: awaiting-human-decision`
+- `Blocked Reason: "<one-line summary of why a replan is needed; reference the criteria that missed>"`
+- `Next Prompt: /resume`
 
 ## Rules
 

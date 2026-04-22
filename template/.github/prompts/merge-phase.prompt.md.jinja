@@ -81,7 +81,7 @@ After printing commands / URL:
 - `Stage: blocked`
 - `Blocked Kind: awaiting-merge-approval`
 - `Blocked Reason: "Phase N merge prepared (mode: <cli|pr>). Run the printed commands; resume with /resume after merge lands on origin/main."`
-- `Next Prompt: n/a` (the next prompt is `/resume`, but it's the human's call when to run it — set on `/resume` itself, not pre-set here).
+- `Next Prompt: /resume` — the human runs this **after** the merge has landed on `origin/main`. The `/resume awaiting-merge-approval` branch verifies the merge (via `git log` or a confirm prompt) before advancing Phase, so cuing it pre-merge is safe.
 
 Append to `## Context` in `CURRENT-STATE.md`:
 `[ISO8601] /merge-phase: phase N prepared (mode: <cli|pr>); awaiting human merge.`

@@ -103,6 +103,6 @@ The builder does **not** edit its own instructions (`.github/copilot-instruction
 
 If a workflow improvement becomes obvious, append it to `## Proposed Workflow Improvements` in `CURRENT-STATE.md` and `docs/reference/agent-improvement-log.md`. Humans apply enforcement-layer improvements via `copier update` or explicit unblock.
 
-## Browser tools (optional)
+## Browser tools (preferred)
 
 Some catalog agents (`designer`, `design-review` prompt) and the `product-owner` agent reference `browser` tools for visual verification. These require the VS Code setting `workbench.browser.enableChatTools` and a running dev server. Without them, the agents fall back to code-only inspection — no failure, just reduced fidelity.

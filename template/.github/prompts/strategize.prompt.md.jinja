@@ -95,6 +95,14 @@ Apply per the `Phase` value rules in [`autonomous-builder.agent.md`](../agents/a
 **Cut the phase branch before mutating state.** Compute a kebab-case slug of the picked title, then:
 
 ```bash
+# If currently on a phase/* branch (e.g., post-/scrap-phase the agent is
+# still on the abandoned branch), check out main first — otherwise the new
+# phase branch is cut from the abandoned branch's tip and carries scrapped
+# commits into the next phase, which /merge-phase will then see in the merge
+# range. Determined dynamically:
+if git rev-parse --abbrev-ref HEAD | grep -qE '^phase/'; then
+  git checkout main
+fi
 # If currently on `strategy/*` (typical post-bootstrap path), branch off it.
 # If on `main` (e.g., after /resume post-merge cut a fresh strategy branch), same.
 git checkout -b phase/<N>-<kebab-title>

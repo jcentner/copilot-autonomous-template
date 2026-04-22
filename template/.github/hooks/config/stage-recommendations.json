@@ -6,7 +6,7 @@
   "implementation-planning": {"prompts": ["/implementation-plan"],         "skills": []},
   "implementation-critique": {"prompts": [],                               "skills": ["anti-slop"]},
   "executing":               {"prompts": ["/implement"],                   "skills": []},
-  "reviewing":               {"prompts": ["/code-review"],                 "skills": []},
+  "reviewing":               {"prompts": ["/strategic-review"],            "skills": []},
   "cleanup":                 {"prompts": ["/phase-complete", "/merge-phase"], "skills": []},
   "blocked":                 {"prompts": ["/resume", "/scrap-phase"],      "skills": []},
   "complete":                {"prompts": ["/vision-expand"],               "skills": []}
