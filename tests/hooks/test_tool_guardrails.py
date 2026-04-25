@@ -184,6 +184,139 @@ class ToolGuardrailsTests(unittest.TestCase):
         )
         self.assertNotEqual(self._decision(out), "deny")
 
+    # --- state.md line-shape carve-out (post-pruning). ---
+
+    def test_state_md_line_shape_replace_allowed(self):
+        # Editing a single non-protected field via line-shape replace_string
+        # should be allowed outside bootstrap. This is the carve-out that
+        # replaces the deleted single-purpose helpers.
+        make_state(self.tmp, stage="reviewing")
+        out = self._run(
+            "replace_string_in_file",
+            {
+                "filePath": "roadmap/state.md",
+                "oldString": "- **Strategic Review**: n/a",
+                "newString": "- **Strategic Review**: pass",
+            },
+        )
+        self.assertNotEqual(self._decision(out), "deny")
+
+    def test_state_md_line_shape_stage_denied(self):
+        # Stage MUST go through write-stage.py — forging Stage=bootstrap
+        # would unlock the enforcement-layer carve-out.
+        make_state(self.tmp, stage="planning")
+        out = self._run(
+            "replace_string_in_file",
+            {
+                "filePath": "roadmap/state.md",
+                "oldString": "- **Stage**: planning",
+                "newString": "- **Stage**: bootstrap",
+            },
+        )
+        self.assertEqual(self._decision(out), "deny")
+
+    def test_state_md_line_shape_blocked_kind_denied(self):
+        make_state(self.tmp, stage="executing")
+        out = self._run(
+            "replace_string_in_file",
+            {
+                "filePath": "roadmap/state.md",
+                "oldString": "- **Blocked Kind**: n/a",
+                "newString": "- **Blocked Kind**: error",
+            },
+        )
+        self.assertEqual(self._decision(out), "deny")
+
+    def test_state_md_multi_line_replace_denied(self):
+        # Carve-out only covers single-line edits; multi-line strings
+        # could smuggle Stage changes inside.
+        make_state(self.tmp, stage="reviewing")
+        out = self._run(
+            "replace_string_in_file",
+            {
+                "filePath": "roadmap/state.md",
+                "oldString": "- **Strategic Review**: n/a\n- **Committed**: yes",
+                "newString": "- **Strategic Review**: pass\n- **Committed**: yes",
+            },
+        )
+        self.assertEqual(self._decision(out), "deny")
+
+    def test_state_md_field_rename_denied(self):
+        make_state(self.tmp, stage="reviewing")
+        out = self._run(
+            "replace_string_in_file",
+            {
+                "filePath": "roadmap/state.md",
+                "oldString": "- **Strategic Review**: n/a",
+                "newString": "- **Foo**: pass",
+            },
+        )
+        self.assertEqual(self._decision(out), "deny")
+
+    def test_state_md_multi_replace_safe_field_allowed(self):
+        make_state(self.tmp, stage="executing")
+        out = self._run(
+            "multi_replace_string_in_file",
+            {
+                "replacements": [
+                    {
+                        "filePath": "roadmap/state.md",
+                        "oldString": "- **Active Slice**: 1",
+                        "newString": "- **Active Slice**: 2",
+                    },
+                    {
+                        "filePath": "roadmap/state.md",
+                        "oldString": "- **Reviewer Invoked**: yes",
+                        "newString": "- **Reviewer Invoked**: pending",
+                    },
+                ]
+            },
+        )
+        self.assertNotEqual(self._decision(out), "deny")
+
+    def test_state_md_multi_replace_one_protected_denied(self):
+        # If any one of the batch targets a helper-required field, the
+        # whole call is denied.
+        make_state(self.tmp, stage="executing")
+        out = self._run(
+            "multi_replace_string_in_file",
+            {
+                "replacements": [
+                    {
+                        "filePath": "roadmap/state.md",
+                        "oldString": "- **Active Slice**: 1",
+                        "newString": "- **Active Slice**: 2",
+                    },
+                    {
+                        "filePath": "roadmap/state.md",
+                        "oldString": "- **Stage**: executing",
+                        "newString": "- **Stage**: complete",
+                    },
+                ]
+            },
+        )
+        self.assertEqual(self._decision(out), "deny")
+
+    def test_state_md_multi_replace_obfuscated_path_denied(self):
+        # Regression: a `./roadmap/state.md` entry inside a multi_replace
+        # batch must not bypass the line-shape check by failing the
+        # internal target-equality test (which would leave the per-entry
+        # edit list empty and falsely allow a Stage write).
+        make_state(self.tmp, stage="executing")
+        out = self._run(
+            "multi_replace_string_in_file",
+            {
+                "replacements": [
+                    {
+                        "filePath": "./roadmap/state.md",
+                        "oldString": "- **Stage**: executing",
+                        "newString": "- **Stage**: bootstrap",
+                    },
+                ]
+            },
+        )
+        self.assertEqual(self._decision(out), "deny")
+
     def test_current_state_md_write_allowed_anytime(self):
         # CURRENT-STATE.md is narrative — agents append to Context,
         # Proposed Improvements, etc. throughout the lifecycle.

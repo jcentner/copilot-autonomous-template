@@ -33,10 +33,18 @@ candidate list is in the most recent `roadmap/strategy-*.md` artifact.
    re-run `/strategize` instead of re-presenting.
 3. Otherwise re-present the candidates via `vscode_askQuestions`.
 4. On a pick (any of the listed candidates):
-   - If `Phase == 0`, set `Phase: 1`. Otherwise leave `Phase` alone.
    - **Cut the phase branch before mutating state:** `git checkout -b phase/<N>-<kebab-title>` (off `strategy/*` or `main`, whichever the agent is on). Required for `branch-gate.py` and `/merge-phase`'s branch-name precondition.
-   - Set `Phase Title: <chosen title>`.
-   - Set `Stage: planning`, `Blocked Kind: n/a`, `Next Prompt: /design-plan`.
+   - Stamp Phase identity (handles the `Phase == 0 → 1` bootstrap case via `--number 1`; otherwise omit `--number` to leave it alone):
+     ```bash
+     # First strategy approval after bootstrap:
+     python3 .github/hooks/scripts/write-phase.py --number 1 --title "<chosen title>"
+     # Subsequent picks (Phase already incremented by post-merge resume):
+     python3 .github/hooks/scripts/write-phase.py --title "<chosen title>"
+     ```
+   - Advance Stage:
+     ```bash
+     python3 .github/hooks/scripts/write-stage.py planning --next-prompt /design-plan
+     ```
    - Append to `## Context`: `[ISO8601] resume: strategy approved (phase N — <title>)`.
 
 ### `awaiting-merge-approval`
@@ -56,17 +64,15 @@ the merge landed, then advances Phase.
 4. If `origin` is unreachable / not configured / no match → `vscode_askQuestions`:
    "Confirm phase N merge completed? [yes / no / cancel]". On `yes` proceed; on
    `no` refuse to advance and leave state unchanged; on `cancel` exit silently.
-5. **Increment `Phase`** (`Phase: N+1`) and reset all Phase-scoped fields:
-   - `Phase Title: Strategy Pending`
-   - `Design Plan: n/a`, `Design Status: n/a`, `Design Critique Rounds: 0`
-   - `Implementation Plan: n/a`, `Implementation Status: n/a`,
-     `Implementation Critique Rounds: 0`
-   - `Active Slice: n/a`, `Slice Total: n/a`
-   - All Slice Evidence fields (`Evidence For Slice`, `Tests Written`,
-     `Tests Pass`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings: 0`,
-     `Major Findings: 0`, `Strategic Review`, `Committed`) → `n/a` / `0`
-   - `Blocked Kind: n/a`, `Blocked Reason: n/a`
-   - `Stage: strategy`, `Next Prompt: /strategize`
+5. **Increment `Phase`** and reset all Phase-scoped fields in one atomic call:
+   ```bash
+   python3 .github/hooks/scripts/write-phase.py --number <N+1> \
+       --title "Strategy Pending" --reset-evidence
+   ```
+   `--reset-evidence` clears every Slice Evidence field, planning-artifact field, slice cursor, and critique-round counter back to its `state.md.jinja` default. Then advance Stage:
+   ```bash
+   python3 .github/hooks/scripts/write-stage.py strategy --next-prompt /strategize
+   ```
 6. **Cut a fresh strategy branch off updated `main`** so the next session's first commit (the strategize artifact) doesn't fight `branch-gate.py`:
    ```bash
    git checkout main
@@ -82,7 +88,9 @@ the merge landed, then advances Phase.
 unchanged (the abandoned number is reused for the next pick).
 
 1. `Blocked Kind: scrapped-by-human` is a transient marker only — clear it.
-2. Set `Stage: strategy`, `Blocked Kind: n/a`, `Next Prompt: /strategize`.
+2. ```bash
+   python3 .github/hooks/scripts/write-stage.py strategy --next-prompt /strategize
+   ```
 3. Append to `## Context`: `[ISO8601] resume: post-scrap; running strategize for replacement phase N`.
 
 ### `awaiting-design-approval`
@@ -98,23 +106,25 @@ waiting for you to approve the design before implementation planning begins.
    - **Abandon**: kill this phase entirely.
 
 3. On **Approve**:
-   - Set `Stage: implementation-planning`.
-   - Set `Blocked Kind: n/a`.
-   - Clear `Blocked Reason: n/a`.
-   - Set `Next Prompt: /implementation-plan` (otherwise the stale `/resume` cue from the design-approval transition would loop the human back here).
-   - Append to `## Context` in `CURRENT-STATE.md`: `[ISO8601] resume: design approved by human, advancing to implementation-planning`.
+   ```bash
+   python3 .github/hooks/scripts/write-stage.py implementation-planning \
+       --next-prompt /implementation-plan
+   ```
+   The helper auto-clears `Blocked Kind` / `Blocked Reason`. Setting `Next Prompt` here matters — otherwise the stale `/resume` cue from the design-approval transition would loop the human back here. Then append to `## Context` in `CURRENT-STATE.md`: `[ISO8601] resume: design approved by human, advancing to implementation-planning`.
 
 4. On **Revise**:
-   - Set `Stage: design-critique`.
-   - Set `Design Status: revise`.
-   - Set `Blocked Kind: n/a`.
-   - Set `Next Prompt: /design-plan` (mirrors `record-verdict.py`'s revise mutation).
-   - Record human feedback in `Blocked Reason` (will be cleared by next planner pass) or directly in the design plan.
+   ```bash
+   python3 .github/hooks/scripts/write-plan-evidence.py design-status revise
+   python3 .github/hooks/scripts/write-stage.py design-critique --next-prompt /design-plan
+   ```
+   Record human feedback directly in the design plan (or pass it as `--blocked-reason` on a subsequent block, though leaving Stage at `design-critique` is fine).
 
 5. On **Abandon**:
-   - Leave `Stage: blocked`.
-   - Set `Blocked Kind: awaiting-human-decision`.
-   - Set `Blocked Reason: "Human abandoned phase N — needs new direction."`.
+   ```bash
+   python3 .github/hooks/scripts/write-stage.py blocked \
+       --blocked-kind awaiting-human-decision \
+       --blocked-reason "Human abandoned phase N — needs new direction."
+   ```
 
 ### `awaiting-vision-update` / `vision-exhausted`
 
@@ -129,11 +139,12 @@ The vision needs to be expanded or rewritten before work can continue.
 A non-design human decision is required. The question is in `Blocked Reason`.
 
 1. Read `Blocked Reason` aloud (or display via `vscode_askQuestions`).
-2. After the human answers, the answer determines the next stage. If you
-   can infer it from the answer, set `Stage` accordingly. Otherwise, ask the
-   human which stage to resume in.
-3. Set `Blocked Kind: n/a`, clear `Blocked Reason`.
-4. Append to `## Context` in `CURRENT-STATE.md`.
+2. After the human answers, the answer determines the next stage. Run:
+   ```bash
+   python3 .github/hooks/scripts/write-stage.py <inferred-stage> --next-prompt /<prompt>
+   ```
+   The helper auto-clears `Blocked Kind` / `Blocked Reason`. If you cannot infer the stage, ask the human which stage to resume in.
+3. Append to `## Context` in `CURRENT-STATE.md`.
 
 ### `error`
 
@@ -143,18 +154,18 @@ required — do **not** auto-resume.
 1. Read `Blocked Reason` and the latest entries in
    `roadmap/sessions/<latest>.md`.
 2. Help the human diagnose the failure.
-3. Once fixed, ask the human to set `Stage` and `Blocked Kind: n/a` manually,
+3. Once fixed, ask the human to specify the recovery `Stage` and run
+   `python3 .github/hooks/scripts/write-stage.py <stage> --next-prompt /<prompt>`,
    or assist them in doing so once the underlying cause is resolved.
 
 ## State updates
 
 Every successful resume must:
 
-- Set `Blocked Kind: n/a`.
-- Set the new `Stage` value.
-- Update `Blocked Reason` to `n/a` (or replace with new context if re-blocking).
-- Append a one-line entry to `## Context` in `CURRENT-STATE.md` summarising
-  the resume decision.
+- Use `write-stage.py` to set the new `Stage` (auto-clears Blocked Kind / Reason).
+- Append a one-line entry to `## Context` in `CURRENT-STATE.md` summarising the resume decision.
+
+The session-gate hook validates the new state on next stop.
 
 The session-gate hook validates the new state on next stop.
 

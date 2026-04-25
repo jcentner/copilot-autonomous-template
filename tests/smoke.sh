@@ -46,6 +46,9 @@ required=(
   ".github/hooks/scripts/tester-isolation.py"
   ".github/hooks/scripts/write-test-evidence.py"
   ".github/hooks/scripts/write-commit-evidence.py"
+  ".github/hooks/scripts/write-plan-evidence.py"
+  ".github/hooks/scripts/write-stage.py"
+  ".github/hooks/scripts/write-phase.py"
   ".github/hooks/scripts/branch-gate.py"
   ".github/hooks/scripts/record-verdict.py"
   ".github/hooks/config/branch-policy.json"
@@ -385,5 +388,127 @@ grep -q "\*\*Blocked Kind\*\*: awaiting-design-approval" "$TMP/roadmap/state.md"
   echo "FAIL: record-verdict did not set Blocked Kind: awaiting-design-approval" >&2; exit 1; }
 grep -q "\*\*Next Prompt\*\*: /resume" "$TMP/roadmap/state.md" || {
   echo "FAIL: record-verdict did not set Next Prompt: /resume" >&2; exit 1; }
+
+echo "==> state-writer helpers: every prompt/agent that mutates a state field references a sanctioned helper"
+python3 - <<PY
+"""Coverage lint: prompts/agents that instruct a state mutation must reference
+the sanctioned helper for that field, not a bare 'Set Field: value'.
+
+This catches the regression that motivated this lint: a prompt prose-instructs
+'Set Stage: blocked' without naming the helper, and the agent reaches for a
+terminal one-liner or a blocked direct edit when terminal is disabled.
+
+Implementation:
+- For each (field, helper) pair in FIELD_TO_HELPER, scan prompt + agent files
+  under .github/{prompts,agents}.
+- A file 'instructs a mutation' if it contains an instruction-shaped phrase
+  ('Set \`Field' / 'set \`Field' / 'Update \`Field' / 'Clear \`Field' /
+  'Reset \`Field') for that field.
+- A file 'references the helper' if it mentions the helper script name
+  anywhere in the body (typically in a fenced bash block).
+- An instruction without the helper reference is a failure.
+
+Known exceptions (file is allowed to mention the field as documentation,
+not as an instruction): listed in FILE_FIELD_EXEMPTIONS.
+"""
+import pathlib, re, sys
+
+ROOT = pathlib.Path("$TMP/.github")
+FILES = list(ROOT.glob("prompts/*.prompt.md")) + list(ROOT.glob("agents/*.agent.md"))
+
+# Field name -> helper script that owns it. Only fields whose writes MUST go
+# through a helper (cross-field invariants or threat-model gates) are listed.
+# Other fields (Active Slice, Reviewer Invoked, Review Verdict, Critical/Major
+# Findings, Strategic Review, Merge Mode) are allowed via line-shape
+# replace_string_in_file edits per the carve-out in tool-guardrails.py.
+FIELD_TO_HELPER = {
+    "Stage": "write-stage.py",
+    "Blocked Kind": "write-stage.py",
+    "Blocked Reason": "write-stage.py",
+    "Next Prompt": "write-stage.py",
+    "Phase": "write-phase.py",
+    "Phase Title": "write-phase.py",
+    "Design Plan": "write-plan-evidence.py",
+    "Design Status": "write-plan-evidence.py",
+    "Implementation Plan": "write-plan-evidence.py",
+    "Implementation Status": "write-plan-evidence.py",
+    "Slice Total": "write-plan-evidence.py",
+    "Tests Pass": "write-test-evidence.py",
+    "Tests Written": "write-test-evidence.py",
+    "Committed": "write-commit-evidence.py",
+}
+
+# (filename, field) pairs allowed to instruct without referencing the helper —
+# typically because the instruction is "do NOT write this field" or because
+# another helper (e.g., record-verdict.py) is the legitimate writer in that
+# context. Keep this list small; each entry is a deliberate carve-out.
+FILE_FIELD_EXEMPTIONS = {
+    # critic agent explicitly forbids writing Blocked Reason, Stage,
+    # Critique Rounds itself; record-verdict.py is the writer.
+    ("critic.agent.md", "Blocked Reason"),
+    ("critic.agent.md", "Stage"),
+}
+
+INSTRUCTION_RE = re.compile(
+    r"\b(?:set|update|clear|reset|increment|stamp|write)\s+\`(?P<field>[A-Z][^\`]+?)(?:\`|:)",
+    re.IGNORECASE,
+)
+
+failures = []
+for path in sorted(FILES):
+    text = path.read_text()
+    name = path.name
+    for match in INSTRUCTION_RE.finditer(text):
+        field = match.group("field").strip()
+        # Strip trailing ': value' if the regex caught it.
+        field = field.split(":", 1)[0].strip()
+        if field not in FIELD_TO_HELPER:
+            continue
+        if (name, field) in FILE_FIELD_EXEMPTIONS:
+            continue
+        # Skip negation context: "do NOT increment", "don't set", "never reset"
+        # are warnings against a mutation, not instructions to perform one.
+        preceding = text[max(0, match.start() - 40): match.start()].lower()
+        if re.search(r"\b(?:not|don't|never|do\s+not|cannot|must\s+not|refuse)\b", preceding):
+            continue
+        helper = FIELD_TO_HELPER[field]
+        if helper not in text:
+            snippet = text[max(0, match.start() - 40): match.end() + 40].replace("\n", " ")
+            failures.append(
+                f"  {name}: instructs mutation of '{field}' but does not reference {helper}\n"
+                f"    near: ...{snippet}..."
+            )
+
+if failures:
+    print("FAIL: state-writer coverage gaps:")
+    for f in failures:
+        print(f)
+    sys.exit(1)
+PY
+
+echo "==> write-stage.py: enforces blocked invariant (smoke)"
+cp "$TMP/roadmap/state.md.bak" "$TMP/roadmap/state.md"
+trap - ERR
+set +e
+(cd "$TMP" && python3 .github/hooks/scripts/write-stage.py blocked >/dev/null 2>&1)
+rc=$?
+set -e
+trap 'echo "FAIL at line $LINENO" >&2' ERR
+if [[ $rc -ne 3 ]]; then
+  echo "FAIL: write-stage.py blocked without --blocked-kind should exit 3, got $rc" >&2
+  exit 1
+fi
+(cd "$TMP" && python3 .github/hooks/scripts/write-stage.py blocked \
+  --blocked-kind awaiting-merge-approval --next-prompt /merge-phase >/dev/null) || {
+    echo "FAIL: write-stage.py valid blocked transition rejected" >&2; exit 1; }
+grep -q "\*\*Stage\*\*: blocked" "$TMP/roadmap/state.md" || { echo "Stage not written"; exit 1; }
+grep -q "\*\*Blocked Kind\*\*: awaiting-merge-approval" "$TMP/roadmap/state.md" || { echo "Blocked Kind not written"; exit 1; }
+
+echo "==> write-phase.py --reset-evidence (smoke)"
+cp "$TMP/roadmap/state.md.bak" "$TMP/roadmap/state.md"
+(cd "$TMP" && python3 .github/hooks/scripts/write-phase.py --number 5 --title "Demo" --reset-evidence >/dev/null) || {
+  echo "FAIL: write-phase.py reset rejected"; exit 1; }
+grep -q "\*\*Phase\*\*: 5" "$TMP/roadmap/state.md" || { echo "Phase not written"; exit 1; }
+grep -q "\*\*Phase Title\*\*: Demo" "$TMP/roadmap/state.md" || { echo "Title not written"; exit 1; }
 
 echo "ALL SMOKE CHECKS PASSED"

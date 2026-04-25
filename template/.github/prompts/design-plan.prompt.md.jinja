@@ -70,10 +70,14 @@ Ordered, independently-shippable slices with file-level hints.
 
 ## After writing
 
-Update `roadmap/state.md`:
+Direct edits to `roadmap/state.md` are blocked by `tool-guardrails.py`. Stamp the planning fields via the sanctioned helper:
 
-- Set **Design Plan** to the file path (`roadmap/phases/phase-N-design.md`).
-- Set **Design Status** to `draft`.
+```bash
+python3 .github/hooks/scripts/write-plan-evidence.py design-plan roadmap/phases/phase-N-design.md
+python3 .github/hooks/scripts/write-plan-evidence.py design-status draft
+```
+
+The helper validates that the plan file exists and that the status value is in the canonical vocabulary (`draft | in-critique | approved | revise | rethink | waived`).
 
 ## Handoff
 

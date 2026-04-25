@@ -66,11 +66,15 @@ What the builder must verify before invoking the reviewer.
 
 ## After writing
 
-Update `roadmap/state.md`:
+Direct edits to `roadmap/state.md` are blocked by `tool-guardrails.py`. Stamp the planning fields via the sanctioned helper:
 
-- Set **Implementation Plan** to the new file path.
-- Set **Implementation Status** to `draft`.
-- Set **Slice Total** to the number of slices in the plan (the reviewer agent reads this on every invocation; the field stays `n/a` until you write it here).
+```bash
+python3 .github/hooks/scripts/write-plan-evidence.py impl-plan roadmap/phases/phase-N-implementation.md
+python3 .github/hooks/scripts/write-plan-evidence.py impl-status draft
+python3 .github/hooks/scripts/write-plan-evidence.py slice-total <number-of-slices>
+```
+
+All three are required. `Slice Total` ships as `n/a` and the reviewer agent reads it on every invocation, so omitting it will block review.
 
 ## Handoff
 

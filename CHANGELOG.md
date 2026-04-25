@@ -6,6 +6,82 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] — 2026-04-25
+
+Patch release. Fixes a `tool-guardrails.py` denial that blocked `/design-plan`
+(and several other prompts) from stamping `state.md` because no sanctioned
+CLI helper existed for the field — the agent's only remaining path was a
+`python3 -c "from _state_io..."` one-liner, which the guardrail correctly
+denied. The fix splits state writes into two sanctioned paths: helpers
+where they earn their keep (cross-field invariants or the bootstrap-forging
+threat model), and a line-shape carve-out for the rest. No state.md schema
+changes; no new stages, blocked kinds, or hook events. Generated repos can
+pull this via `copier update` without migration steps.
+
+### Added — Sanctioned helpers for fields that need invariants
+- `write-stage.py` — sole writer of `Stage` / `Blocked Kind` / `Blocked
+  Reason` / `Next Prompt`. Enforces the `Stage=blocked ⇒ Blocked Kind`
+  invariant and is the gate against forging `Stage: bootstrap` to unlock
+  the enforcement-layer carve-out (ADR-009).
+- `write-phase.py` — atomic `Phase` / `Phase Title` writes with optional
+  `--reset-evidence` that resets all 17 slice/review/commit/plan fields
+  in one transaction (one missed field would corrupt downstream hook reads).
+- `write-plan-evidence.py` — `design-plan` / `design-status` / `impl-plan`
+  / `impl-status` / `slice-total` subcommands. Validates plan-file
+  existence and status vocabulary.
+- `_state_io.update_state_fields(cwd, {field: value, ...})` library
+  function for atomic multi-field writes (used by `write-stage.py` and
+  `write-phase.py`).
+
+### Added — Line-shape carve-out in `tool-guardrails.py`
+- `replace_string_in_file` and `multi_replace_string_in_file` against
+  `roadmap/state.md` are now allowed when every (oldString, newString)
+  pair matches `^- **Field**: value$` line shape, the field name is
+  unchanged between old and new, and the field is NOT in
+  `{Stage, Blocked Kind, Blocked Reason}`. `create_file` against
+  `state.md` is still denied unconditionally outside `bootstrap`.
+- This covers `Active Slice`, `Reviewer Invoked`, `Review Verdict`,
+  `Critical Findings`, `Major Findings`, `Strategic Review`, `Merge Mode`,
+  and the slice-evidence reset fields. These are data the hooks read,
+  not enforcement-layer fields, and ceremony around them was making the
+  workflow brittle without raising the security bar.
+
+### Changed — Callers updated to use sanctioned helpers
+- `planner.agent.md.jinja`, `design-plan.prompt.md.jinja`,
+  `implementation-plan.prompt.md.jinja` now call `write-plan-evidence.py`
+  for all plan-status writes.
+- `phase-complete.prompt.md.jinja`, `resume.prompt.md.jinja`,
+  `vision-expand.prompt.md.jinja`, `strategize.prompt.md.jinja`,
+  `autonomous-builder.agent.md.jinja`, `product-owner.agent.md.jinja`
+  now call `write-stage.py` / `write-phase.py` for stage and phase
+  transitions instead of inline edits.
+- `implement.prompt.md.jinja` and `autonomous-builder.agent.md.jinja`
+  slice-loop now use line-shape edits for `Active Slice` and the
+  per-slice evidence reset.
+- `AGENTS.md.jinja` ships a "State writers" table documenting the split
+  (helpers vs. carve-out) so agents have one place to look up which
+  fields take which path.
+
+### Added — Smoke lint
+- `tests/smoke.sh` scans every prompt and agent file for instruction-
+  shaped phrases ("Set/Update/Clear `Field`") and asserts the file
+  references the owning helper for fields in `FIELD_TO_HELPER`. Catches
+  prose drift where a prompt tells an agent to write a field but doesn't
+  point it at the sanctioned helper.
+
+### Tests
+- 265 hook unit tests pass (8 new tests in `test_tool_guardrails.py`
+  cover the line-shape carve-out: safe-field allow, Stage/Blocked Kind
+  deny, multi-line deny, field-rename deny, multi_replace allow/deny).
+- `tests/smoke.sh` passes including the new state-writer coverage lint.
+
+### Migration
+- `copier update` then accept the new helpers and prose. No state.md
+  schema changes; in-flight phases continue without intervention. If you
+  had local prompts/agents calling `python3 -c "from _state_io..."` for
+  state writes, replace them with the matching helper or a line-shape
+  `replace_string_in_file` per the new `AGENTS.md` table.
+
 ## [1.2.1] — 2026-04-22
 
 Patch release. Fixes workflow contradictions discovered while running v1.2.0

@@ -64,12 +64,26 @@ PROTECTED_EXACT_PATHS = {
     "AGENTS.md",
 }
 
-# Writes to state.md are blocked outside bootstrap. The legitimate writers
-# are (a) BOOTSTRAP.md during bootstrap, (b) hook helper
-# `write-test-evidence.py`, and (c) `_state_io.update_state_field` invoked
-# by hooks. None of those go through the file-edit tools this hook gates.
-# Without this protection, an agent could `create_file` over state.md with
-# `Stage: bootstrap` and unlock the enforcement-layer carve-out.
+# Writes to state.md are heavily restricted outside `bootstrap`. The legitimate
+# writers are:
+#   (a) BOOTSTRAP.md during bootstrap (carve-out below covers it),
+#   (b) hook helpers `write-test-evidence.py`, `write-commit-evidence.py`,
+#       `write-plan-evidence.py`, `write-stage.py`, `write-phase.py`, and
+#       `record-verdict.py`,
+#   (c) other hooks calling `_state_io.update_state_field(s)` directly,
+#   (d) line-shape `replace_string_in_file` / `multi_replace_string_in_file`
+#       edits that touch a single `- **Field**: value` line for a field NOT
+#       in `STATE_HELPER_REQUIRED_FIELDS` (see `_check_state_md_edit`).
+#
+# The line-shape carve-out exists because the threat model is narrow:
+# forging `Stage: bootstrap` (or its coupled fields) would unlock the
+# enforcement-layer carve-out and let an agent rewrite hooks/agents/instructions.
+# Other fields are just data the hooks read; mis-writing them mis-routes the
+# next prompt at worst, which the next session will catch. Helpers stay
+# mandatory only where the threat or the cross-field invariant is real.
+#
+# `create_file` against state.md remains blocked unconditionally outside
+# bootstrap — it would replace the whole file and bypass the line-shape check.
 #
 # CURRENT-STATE.md is intentionally NOT protected here — it is narrative
 # and agents append to it (Context, Proposed Improvements, Vision Pivots,
@@ -77,6 +91,25 @@ PROTECTED_EXACT_PATHS = {
 PROTECTED_STATE_FILES = {
     "roadmap/state.md",
 }
+
+# Fields whose writes MUST go through a sanctioned helper. Stage and its
+# coupled fields are gated because forging Stage=bootstrap unlocks the
+# enforcement-layer carve-out, and because (Stage, Blocked Kind, Blocked
+# Reason) carry a cross-field invariant that `write-stage.py` enforces.
+STATE_HELPER_REQUIRED_FIELDS = {
+    "Stage",
+    "Blocked Kind",
+    "Blocked Reason",
+}
+
+# Matches a single `- **Field**: value` line (no surrounding context). Used by
+# the line-shape carve-out to verify that an edit is targeting one machine
+# field, not arbitrary file content. Anchored to the whole string and explicit
+# about no embedded newlines so multi-line strings (which could smuggle a
+# Stage change inside) fail the match.
+_STATE_LINE_RE = re.compile(
+    r"\A\s*-\s+\*\*(?P<field>[^*\n]+)\*\*:\s*(?P<value>[^\n]*?)\s*\Z",
+)
 
 DANGEROUS_TERMINAL_PATTERNS = [
     (
@@ -209,6 +242,96 @@ def _is_protected_path(rel_path):
     return any(rel_path.startswith(prefix) for prefix in PROTECTED_PATH_PREFIXES)
 
 
+def _check_state_md_edit(tool_name, tool_input, rel, cwd=None):
+    """Apply the line-shape carve-out for edits against `roadmap/state.md`.
+
+    Returns a denial string if the edit must be blocked, or None to allow.
+
+    The carve-out:
+      - `create_file` against state.md is always blocked outside bootstrap
+        (would replace the whole file and bypass the line-shape check).
+      - `replace_string_in_file` and `multi_replace_string_in_file` are
+        allowed iff every (oldString, newString) pair targets a single
+        `- **Field**: value` line for the same field, AND that field is NOT
+        in `STATE_HELPER_REQUIRED_FIELDS` (Stage / Blocked Kind /
+        Blocked Reason must go through `write-stage.py`).
+
+    Rationale: the threat model that justifies blocking direct edits is
+    forging Stage=bootstrap to unlock the enforcement-layer carve-out.
+    Other fields are just data; helpers exist for them where validation or
+    cross-field invariants are valuable, but agents can also edit them
+    directly via line-shape replacements when terminal access is gated.
+    """
+    if tool_name == "create_file":
+        return (
+            f"Blocked: 'create_file' against '{rel}' would overwrite workflow "
+            "state. Use the line-shape `replace_string_in_file` carve-out or "
+            "the helpers in `.github/hooks/scripts/write-*.py`."
+        )
+
+    edits = []
+    if tool_name == "replace_string_in_file":
+        old = tool_input.get("oldString") or tool_input.get("old_string") or ""
+        new = tool_input.get("newString") or tool_input.get("new_string") or ""
+        edits.append((old, new))
+    elif tool_name == "multi_replace_string_in_file":
+        for r in tool_input.get("replacements") or []:
+            if not isinstance(r, dict):
+                continue
+            # Only the entries actually targeting state.md count; the helper
+            # path-collector flagged the call because at least one did.
+            # Normalize the same way `check_file_operation` does so an
+            # obfuscated path like `./roadmap/state.md` cannot bypass the
+            # match (which would leave `edits` empty and falsely allow).
+            target = r.get("filePath") or r.get("file_path") or ""
+            if not target:
+                continue
+            target_rel = _normalize(target, cwd)
+            if target_rel != rel:
+                continue
+            old = r.get("oldString") or r.get("old_string") or ""
+            new = r.get("newString") or r.get("new_string") or ""
+            edits.append((old, new))
+    else:
+        # Unknown edit tool against state.md — be conservative.
+        return (
+            f"Blocked: tool '{tool_name}' may not write '{rel}'. Use a "
+            "sanctioned helper under `.github/hooks/scripts/write-*.py` or a "
+            "single-line `replace_string_in_file` edit."
+        )
+
+    if not edits:
+        return None
+
+    for old, new in edits:
+        old_match = _STATE_LINE_RE.match(old or "")
+        new_match = _STATE_LINE_RE.match(new or "")
+        if not old_match or not new_match:
+            return (
+                f"Blocked: edit to '{rel}' is not a single-line "
+                "`- **Field**: value` change. Multi-line edits to state.md "
+                "must go through a sanctioned helper "
+                "(`.github/hooks/scripts/write-*.py`)."
+            )
+        old_field = old_match.group("field").strip()
+        new_field = new_match.group("field").strip()
+        if old_field != new_field:
+            return (
+                f"Blocked: edit to '{rel}' rewrites field name "
+                f"('{old_field}' -> '{new_field}'). Field renames require "
+                "a copier update, not a runtime edit."
+            )
+        if old_field in STATE_HELPER_REQUIRED_FIELDS:
+            return (
+                f"Blocked: '{old_field}' must be written via "
+                "`.github/hooks/scripts/write-stage.py` (it enforces the "
+                "Stage / Blocked Kind invariant and is the gate against "
+                "forging `Stage: bootstrap` to unlock the enforcement-layer "
+                "carve-out)."
+            )
+    return None
+
+
 def _collect_paths(tool_input, tool_name):
     """Return all candidate target paths for an edit tool, including every
     entry in `multi_replace_string_in_file`'s `replacements` array."""
@@ -256,13 +379,9 @@ def check_file_operation(tool_input, tool_name, cwd=None):
         if "node_modules/" in rel or "node_modules\\" in raw:
             return "Blocked: Cannot modify files inside node_modules/. Use package manager commands instead."
         if rel in PROTECTED_STATE_FILES and not bootstrap:
-            return (
-                f"Blocked: '{rel}' is workflow state. Only bootstrap and the "
-                "hook-internal writers (write-test-evidence.py, _state_io) "
-                "may write it — overwriting via create_file/replace would let "
-                "an agent forge `Stage: bootstrap` and unlock the "
-                "enforcement-layer carve-out."
-            )
+            denial = _check_state_md_edit(tool_name, tool_input, rel, cwd)
+            if denial is not None:
+                return denial
         if _is_protected_path(rel) and not bootstrap:
             return (
                 f"Blocked: '{rel}' is part of the enforcement layer (hooks, agents, "

@@ -62,6 +62,25 @@ The `autonomous-builder` agent is for **major feature work** that goes through t
 
 See [`.github/prompts/PROMPT-GUIDE.md`](.github/prompts/PROMPT-GUIDE.md). The prompts are override entry points — the autonomous builder orchestrates the full pipeline.
 
+## State writers (sanctioned helpers)
+
+`tool-guardrails.py` restricts writes to `roadmap/state.md` outside `bootstrap`. The threat model is narrow: forging `Stage: bootstrap` (or its coupled fields) would unlock the enforcement-layer carve-out and let an agent rewrite hooks/agents/instructions. So the rules split:
+
+- **Stage / Blocked Kind / Blocked Reason** — must go through `write-stage.py`. Direct edits are denied.
+- **Other machine fields** — single-line `replace_string_in_file` edits matching `^- **Field**: value$` are allowed (line-shape carve-out). Use the helpers below where they exist; for fields without a helper, a direct line-shape edit is the sanctioned path.
+- **`create_file` against `roadmap/state.md`** — denied unconditionally outside bootstrap (would replace the whole file).
+
+| Helper | Fields written | Why a helper exists |
+|---|---|---|
+| `write-stage.py` | `Stage`, `Blocked Kind`, `Blocked Reason`, `Next Prompt` | Bootstrap-forging gate + enforces `Stage=blocked ⇒ Blocked Kind` invariant. Mandatory. |
+| `write-phase.py` | `Phase`, `Phase Title`, optional 17-field evidence reset | Phase boundary resets are too error-prone by hand (one missed field corrupts downstream hook reads). |
+| `write-plan-evidence.py` | `Design Plan`, `Design Status`, `Implementation Plan`, `Implementation Status`, `Slice Total` | Validates plan-file existence + status vocabulary. |
+| `write-test-evidence.py` | `Tests Written`, `Tests Pass`, `Evidence For Slice` | Auto-binds Evidence For Slice to current Active Slice. |
+| `write-commit-evidence.py` | `Committed` | Refuses to stamp `yes` if the working tree is dirty. |
+| `record-verdict.py` | Critique-verdict mutations: `Design/Implementation Status`, `Critique Rounds`, plus `Stage`/`Blocked Kind`/`Next Prompt` on cap-exceeded | Enforces round budget + `^VERDICT:` trailer requirement. |
+
+For everything else (`Active Slice`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings`, `Major Findings`, `Strategic Review`, `Merge Mode`), edit the line directly via `replace_string_in_file`. The line-shape carve-out validates the edit is exactly one `- **Field**: value` change.
+
 ## Rules
 
 - **Workflow state vocabulary is exact** — `approved` not `accepted`, `pass` not `passed`. Hooks parse field values literally.

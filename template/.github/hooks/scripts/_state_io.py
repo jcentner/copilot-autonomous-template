@@ -184,19 +184,42 @@ def update_state_field(cwd: str, field: str, value: str) -> bool:
 
     Returns True if the field was found and updated, False otherwise.
     """
+    result = update_state_fields(cwd, {field: value})
+    return result.get(field, False)
+
+
+def update_state_fields(cwd: str, updates: dict) -> dict:
+    """Set multiple `- **Field**: value` lines in state.md in one atomic write.
+
+    `updates` maps field name -> new value (both strings). Returns a dict
+    mapping each requested field to True (found and replaced) or False
+    (field line not present in state.md).
+
+    Multi-field writes matter for cross-field invariants: setting
+    `Stage: blocked` and `Blocked Kind: <kind>` in two separate writes
+    leaves a window where state.md has `Stage: blocked` with the previous
+    `Blocked Kind`, which other hooks could read. One read+rewrite closes
+    that window.
+    """
+    result: dict = {field: False for field in updates}
+    if not updates:
+        return result
     text = read_state_text(cwd)
     if text is None:
-        return False
-    pattern = re.compile(
-        r"^(\s*-\s+\*\*" + re.escape(field) + r"\*\*:)\s*.*$",
-        re.MULTILINE,
-    )
-    new, n = pattern.subn(rf"\1 {value}", text, count=1)
-    if n == 0:
-        return False
-    if new != text:
-        atomic_write(state_path(cwd), new)
-    return True
+        return result
+    new_text = text
+    for field, value in updates.items():
+        pattern = re.compile(
+            r"^(\s*-\s+\*\*" + re.escape(field) + r"\*\*:)\s*.*$",
+            re.MULTILINE,
+        )
+        replaced, n = pattern.subn(rf"\1 {value}", new_text, count=1)
+        if n:
+            new_text = replaced
+            result[field] = True
+    if new_text != text:
+        atomic_write(state_path(cwd), new_text)
+    return result
 
 
 def derive_session_id(input_data: dict) -> str:

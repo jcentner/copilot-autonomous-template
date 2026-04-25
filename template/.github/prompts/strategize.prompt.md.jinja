@@ -89,8 +89,8 @@ catalog gaps, and a one-paragraph rationale.
 
 Apply per the `Phase` value rules in [`autonomous-builder.agent.md`](../agents/autonomous-builder.agent.md):
 
-- If `Phase == 0` (post-bootstrap, never strategized before): set `Phase: 1`.
-- Else: leave `Phase` alone (it was already incremented by `/resume` post-merge, or set by a prior scrap path).
+- If `Phase == 0` (post-bootstrap, never strategized before): pass `--number 1` to the helper below.
+- Else: omit `--number` so Phase is left alone (it was already incremented by `/resume` post-merge, or set by a prior scrap path).
 
 **Cut the phase branch before mutating state.** Compute a kebab-case slug of the picked title, then:
 
@@ -110,23 +110,31 @@ git checkout -b phase/<N>-<kebab-title>
 
 `branch-gate.py` denies commits on `main`/`master`/`trunk`/`prod` outside bootstrap; `/merge-phase` requires the current branch to match `^phase/N-` for the merge handshake. Cutting the branch here makes both happy.
 
-Then update [`state.md`](../../roadmap/state.md):
+Then stamp the new phase identity and stage transition via the sanctioned helpers (do not edit `state.md` directly \u2014 `tool-guardrails.py` blocks it):
 
-- `Phase Title: <chosen title>`
-- `Stage: planning`
-- `Blocked Kind: n/a`
-- `Blocked Reason: n/a`
-- `Next Prompt: /design-plan`
+```bash
+# First strategy approval after bootstrap (Phase == 0):
+python3 .github/hooks/scripts/write-phase.py --number 1 --title "<chosen title>"
+# Subsequent picks (Phase already incremented by post-merge resume):
+python3 .github/hooks/scripts/write-phase.py --title "<chosen title>"
 
-Append to `## Context` in `CURRENT-STATE.md`: `[ISO8601] strategize: phase N — <title>; <one-line rationale>; artifact: roadmap/strategy-…md`.
+python3 .github/hooks/scripts/write-stage.py planning --next-prompt /design-plan
+```
+
+The `write-stage.py` helper auto-clears `Blocked Kind` / `Blocked Reason`.
+
+Append to `## Context` in `CURRENT-STATE.md`: `[ISO8601] strategize: phase N \u2014 <title>; <one-line rationale>; artifact: roadmap/strategy-\u2026md`.
 
 ### On "save and let me think"
 
-- `Stage: blocked`
-- `Blocked Kind: awaiting-strategy-approval`
-- `Blocked Reason: "Strategy artifact saved; human to review and resume."`
-- `Next Prompt: /resume`
-- Do NOT touch `Phase` or `Phase Title`.
+```bash
+python3 .github/hooks/scripts/write-stage.py blocked \
+    --blocked-kind awaiting-strategy-approval \
+    --blocked-reason "Strategy artifact saved; human to review and resume." \
+    --next-prompt /resume
+```
+
+Do NOT touch `Phase` or `Phase Title`.
 
 Append to `## Context`: `[ISO8601] strategize: escaped to human; artifact: roadmap/strategy-…md`.
 

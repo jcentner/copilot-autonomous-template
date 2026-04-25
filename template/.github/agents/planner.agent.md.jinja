@@ -45,16 +45,22 @@ Write `roadmap/phases/phase-N-design.md` with these required sections:
 6. **Test Strategy** — what gets tested at what layer (unit / integration / e2e / manual).
 7. **Slice Breakdown** — ordered list of slices with file-level hints.
 
-After writing, update `roadmap/state.md`:
-- Set `Design Plan` field to the file path.
-- Set `Design Status` to `draft`.
+After writing, update `roadmap/state.md` via the sanctioned helper (direct edits to `state.md` are blocked by `tool-guardrails.py`):
+
+```bash
+python3 .github/hooks/scripts/write-plan-evidence.py design-plan roadmap/phases/phase-N-design.md
+python3 .github/hooks/scripts/write-plan-evidence.py design-status draft
+```
 
 (Per-tool-call activity is auto-logged by `evidence-tracker.py` to the per-session file under `roadmap/sessions/`. You do not need to write a Session Log line.)
 
 ### `design-critique` — revise design after critique
 
 When invoked with feedback from the critic (verdict `revise` or `rethink`), revise the design plan in place. Do not overwrite critic findings files — they are the record of the round. After revising:
-- Set `Design Status` to `in-critique` (re-submitting for another round) in `state.md`.
+
+```bash
+python3 .github/hooks/scripts/write-plan-evidence.py design-status in-critique
+```
 
 ### `implementation-planning` — produce an implementation plan
 
@@ -66,10 +72,15 @@ Write `roadmap/phases/phase-N-implementation.md` grounded in the approved design
 
 Do **not** start implementation planning unless `Design Status` is `approved` or `waived`.
 
-After writing:
-- Set `Implementation Plan` field in `state.md` to the file path.
-- Set `Implementation Status` to `draft`.
-- **Set `Slice Total` to the number of slices in the plan.** The reviewer agent reads this on every invocation; the field is shipped as `n/a` and only the implementation-planning step is positioned to count slices accurately.
+After writing, stamp `state.md` via the helper:
+
+```bash
+python3 .github/hooks/scripts/write-plan-evidence.py impl-plan roadmap/phases/phase-N-implementation.md
+python3 .github/hooks/scripts/write-plan-evidence.py impl-status draft
+python3 .github/hooks/scripts/write-plan-evidence.py slice-total <number-of-slices>
+```
+
+**`Slice Total` is mandatory** — the reviewer agent reads it on every invocation; the field ships as `n/a` and only the implementation-planning step is positioned to count slices accurately.
 
 ### `implementation-critique` — revise implementation plan after critique
 

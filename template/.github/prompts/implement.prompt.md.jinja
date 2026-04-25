@@ -31,10 +31,10 @@ Execute every step in order. Do not skip or reorder:
 6. **Invoke reviewer subagent** on the changed files — always, regardless of file count. Reviewer writes `Review Verdict` + findings to state.md.
 7. **Fix all Critical and Major findings** before committing.
 8. **Commit**: `type(scope): description` format, one slice per commit. Then stamp commit evidence: `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty.
-9. **Advance state (single atomic update)** in state.md:
+9. **Advance state**:
    - **Verify** the reviewer wrote `Reviewer Invoked: yes`, `Review Verdict: <pass|needs-fixes|needs-rework>`, `Critical Findings: N`, `Major Findings: N`. The reviewer agent is the sole writer of these fields per ADR-003 (`subagent-verdict-check.py reviewer` would have blocked otherwise). **Do not overwrite them** — if the values look wrong, re-invoke the reviewer rather than edit them by hand. The `write-commit-evidence.py` helper wrote `Committed`.
-   - Increment `Active Slice`.
-   - Reset slice evidence for the next slice: `Tests Written: pending`, `Tests Pass: pending`, `Reviewer Invoked: pending`, `Review Verdict: pending`, `Critical Findings: 0`, `Major Findings: 0`, `Committed: pending`.
+   - Increment `Active Slice` (line-shape replace is fine).
+   - Reset slice evidence for the next slice: `Tests Written: pending`, `Tests Pass: pending`, `Reviewer Invoked: pending`, `Review Verdict: pending`, `Critical Findings: 0`, `Major Findings: 0`, `Committed: pending`. (`tool-guardrails.py`'s line-shape carve-out allows single-field edits to all of these; only `Stage` / `Blocked Kind` / `Blocked Reason` require a helper.)
    - On the next slice, rerun `write-test-evidence.py` as soon as you have a result. That helper stamps `Evidence For Slice` to the current `Active Slice`; `session-gate` blocks stop while `Evidence For Slice != Active Slice` — the hook-enforced backstop on the manual reset above.
 
 The Stop hook (`session-gate.py`) blocks session end if Slice Evidence is incomplete during `executing`.

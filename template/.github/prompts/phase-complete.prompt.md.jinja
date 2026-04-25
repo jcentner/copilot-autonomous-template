@@ -56,12 +56,16 @@ You are completing the current phase of {{ project_name }}. This prompt drives t
 
 **Do NOT increment `Phase`. Do NOT reset Slice Evidence, Design/Implementation fields, or critique-rounds counters here.** All Phase-scoped resets happen in `/resume` *after* the merge has landed on `origin/main` — running them now would (a) silently bypass the merge approval gate and (b) wipe the very Slice Evidence and `doc-sync: missing` rows that `/merge-phase` scans before approving the merge.
 
-The only state mutations this step performs:
+The only state mutations this step performs (one atomic call):
 
-- Set `Stage: blocked`.
-- Set `Blocked Kind: awaiting-merge-approval`.
-- Set `Blocked Reason: "Phase N cleanup complete; awaiting /merge-phase."`.
-- Set `Next Prompt: /merge-phase`.
+```bash
+python3 .github/hooks/scripts/write-stage.py blocked \
+    --blocked-kind awaiting-merge-approval \
+    --blocked-reason "Phase N cleanup complete; awaiting /merge-phase." \
+    --next-prompt /merge-phase
+```
+
+Do not edit `state.md` directly — `tool-guardrails.py` blocks it. The helper enforces the (Stage, Blocked Kind, Next Prompt) invariant in one write.
 
 The next session runs `/merge-phase`, which prepares the merge commands (or PR URL) per `Merge Mode`, then sits at `awaiting-merge-approval` until the human merges. `/resume` post-merge is the writer that increments `Phase`, resets Slice Evidence and Design/Implementation fields, and sets `Stage: strategy` for the next cycle.
 
