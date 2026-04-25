@@ -6,6 +6,122 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-04-25
+
+Minor release. Installs a single design principle across the lifecycle:
+**an agent must not produce an artifact whose subject it never directly
+observed.** Six gaps closed at every boundary where a subagent commits
+to a claim about a system (codebase, runtime, deployed surface).
+
+> **Trigger:** wyoclear.com Phase 1 design plan proposed `build` slices
+> over functionality already shipped in production (Joint Judiciary
+> meeting videos, "Register to Testify" CTA, Floor Session Audio
+> placeholder, BillStatusBadge column). Three of eight slices were
+> already half-shipped; the planner authored without inspecting either
+> the codebase or the deployed surface; the critic didn't catch it. A
+> human discovered it post-critique by browsing the live site.
+
+> **Mid-phase update note:** existing repos that `copier update` to
+> v1.3.0 will see their next design plan refused by the critic until
+> they add `## Existing Implementation`, their next implementation plan
+> refused until each slice has `Codebase Anchors`, and their next built
+> slice flagged by the reviewer if the commit body lacks a
+> `Runtime check:` block. Either retro-fit the active plans or use
+> `/scrap-phase` and re-strategize.
+
+### Changed — Design plan contract (Block A)
+
+- `/design-plan` prompt now requires a mandatory **Phase 0 — Reality
+  Check** with two layers before slice authoring: **Layer A** (codebase
+  inventory via `grep_search` + `read_file`, with `path:line` evidence
+  or honest negative search) and **Layer B** (deployed/runnable surface
+  inspection via browser/curl/CLI, with honest `n/a — <reason>`
+  fallback when no runnable surface exists).
+- Required new `## Existing Implementation` section in the plan
+  structure summarizing both layers with implications for slices.
+- Every slice now declares a `Kind`: `build | wire-up | augment |
+  audit | drop`. Slices reference Reality Check findings; never
+  propose `build` for code or UI Layer A/B showed exists.
+- `planner.agent.md` mirrors the requirement in the `planning`
+  responsibility and Rules section.
+
+### Changed — Design critic dimensions (Block A)
+
+- New **Reality grounding (check first)** dimension: critic must audit
+  at least one slice itself with `grep_search` (and browser tools when
+  available); undeclared shipped code/UI is **Blocking** regardless of
+  how clean the rest of the plan reads.
+- New **Slice Kind honesty** dimension: silent overlap of a `build`
+  slice with shipped functionality → **Major**.
+
+### Changed — Implementation plan contract (Block B)
+
+- `/implementation-plan` prompt now requires a mandatory **Phase 0 —
+  Codebase verification** before slice authoring.
+- Each slice gets a required **Codebase Anchors (verified)** subsection:
+  every `Files touched` path is confirmed (existing via `read_file`,
+  new via `file_search` negative); every named function / class /
+  route / table / endpoint the slice integrates with cites `path:line`.
+- Slices carry forward the design plan's `Kind`; never silently upgrade
+  `wire-up` / `augment` to `build`.
+- `planner.agent.md` `implementation-planning` section + Rules updated.
+
+### Changed — Implementation critic dimensions (Block C)
+
+- New **Codebase grounding (check first)** dimension on
+  `implementation-critique`: critic audits at least one slice's anchors
+  with `grep_search`; missing/wrong/contradicted anchors → **Blocking**.
+- New **Slice Kind continuity** dimension: silent upgrade of
+  `wire-up` / `augment` → `build`, or implementation inventing slices
+  the design never had → **Major**.
+
+### Changed — Slice loop (Block D)
+
+- New step **5b — Runtime check** in both `autonomous-builder.agent.md`
+  "The slice loop" and the `/implement` prompt. For any slice with
+  `Kind: build | wire-up | augment`, the builder must produce
+  observation evidence the change works on the running surface (UI:
+  dispatch catalog `designer`; API: `curl` + `jq`; CLI: invoke +
+  capture stdout/stderr; library/audit/drop: honest
+  `Runtime check: n/a — <reason ≥20 chars>`).
+- The artifact (or honest `n/a`) goes in the commit body under a
+  `Runtime check:` heading.
+- Step numbers shifted: old 5 → 6 (reviewer), 6 → 7 (fix findings),
+  7 → 8 (commit + commit-evidence), 8 → 9 (verify + advance).
+
+### Changed — Reviewer dimensions (Block E)
+
+- New review dimension #5 **Runtime evidence**: silent omission of the
+  `Runtime check:` block on a `Kind: build | wire-up | augment` slice
+  is a **Major** finding tagged `runtime-evidence: missing`. Honest
+  `n/a — <reason ≥20 chars>` is acceptable; reviewer is consistency
+  backstop, not runtime cop.
+- Findings table example now includes a `runtime-evidence: missing`
+  row alongside the existing `doc-sync: missing` row.
+- Existing dimensions renumbered: Dependency security 5 → 6, Doc-sync
+  6 → 7.
+
+### Changed — Product-owner Review mode (Block F)
+
+- "When browser tools are available, you **may** screenshot and
+  navigate" replaced with **must** observe runnable surfaces (UI/API/
+  CLI). Browser walkthroughs route through catalog `designer`; API/CLI
+  probes via the autonomous-builder. Honest `Runtime observation: n/a`
+  with reason allowed only when there is genuinely no runnable surface.
+- Criteria marked `Met: Yes` based purely on code reading get
+  downgraded to `Partial` with `evidence: code-only` until runtime
+  observation is recorded.
+- New Rules bullet: "Observe before judging."
+
+### Backwards compatibility
+
+- No state.md schema changes. No new vocab in `_state_io.py`. No new
+  hook scripts. No removed prompts or helpers. All changes are contract
+  guidance in agent + prompt files plus matching critic/reviewer review
+  dimensions.
+- All 7 commits land green: `make test-all` (160 hook tests + smoke +
+  contract-drift lint) passes after every block.
+
 ## [1.2.4] — 2026-04-25
 
 Patch release. Tooling-only: adds a contract-drift lint to catch the
