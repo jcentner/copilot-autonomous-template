@@ -51,11 +51,13 @@ Consult on demand via the Explore subagent: ADRs, open questions, tech debt, arc
 
 ### For implementation plans (stage = `implementation-critique`)
 
+- **Codebase grounding (check first)** — does each slice have a `Codebase Anchors (verified)` subsection (Block B contract from `/implementation-plan`)? **Audit at least one slice yourself**: pick one, run `grep_search` for the claimed `Files touched` paths and the named symbols the slice integrates with. If any anchor is missing, wrong, or contradicted by what you find (renamed file, deleted function, non-existent route, new file that already exists), file a **Blocking** finding. Do not trust the plan's narrative.
+- **Slice Kind continuity** — every slice carries forward the design plan's `Kind` (`build | wire-up | augment | audit | drop`). Flag Major when implementation upgrades a `wire-up` / `augment` to `build` without justification, or when implementation invents new slices that have no design counterpart.
 - **Feasibility** — achievable with available tools/stack? complexity proportional to value?
 - **Slice ordering** — dependencies respected? can any slice be cut?
 - **Existing code impact** — what callers/consumers break? migration concerns?
 - **Missing edge cases** — empty inputs, boundaries, concurrent access, dependency unavailability.
-- **Assumptions** — verified against the code, or guessed?
+- **Assumptions** — verified against the code (per Codebase Anchors), or guessed?
 - **Testing gaps** — can each slice be tested independently? hard-to-test scenarios flagged?
 
 ## Finding format
