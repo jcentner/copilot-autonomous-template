@@ -6,6 +6,49 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] — 2026-04-25
+
+Patch release. Tooling-only: adds a contract-drift lint to catch the
+class of bug v1.2.1 / v1.2.2 / v1.2.3 all patched. No template behavior
+change; `copier update` is optional unless you also run the project's
+smoke test.
+
+### Added — `tests/contract_drift_lint.py`
+
+Compares every documented value / reference in prompt + agent files
+against the source-of-truth contract:
+
+  - **A.** `agents:` frontmatter references resolve to a real agent file
+    (template or catalog) or `Explore`.
+  - **B.** Prompts that pin a non-builder agent and instruct subagent
+    handoffs ("hand off to / dispatch / invoke X") — pinned agent must
+    declare the `agent` tool and list X in its `agents:` whitelist.
+    Catches the v1.2.3 planner bug.
+  - **C.** `/<command>` slash-command references resolve to a real
+    prompt or are in the catalog (path-aware: skips URLs, file paths,
+    glob fragments).
+  - **D.** `Next Prompt: /foo` values are in `VALID_NEXT_PROMPTS`.
+    Catches the class of v1.2.1 routing bugs.
+  - **E.** `Stage: foo` values are in `VALID_STAGES`.
+  - **F.** `Blocked Kind: foo` values are in `VALID_BLOCKED_KINDS`.
+  - **G.** `.github/hooks/scripts/<name>.py` references exist on disk.
+    Catches the v1.2.2 helper-name drift class.
+
+The lint reads the source of truth at lint time (parses `_state_io.py`
+for the vocab sets, walks `.github/agents/` and `.github/prompts/` for
+file existence). Adding a new stage / blocked kind / next prompt / hook
+script automatically extends the lint with no manual update.
+
+Negative-tested on all 6 detection categories: each produces a
+non-zero exit and names the offending file + value.
+
+### Wired into smoke
+
+`tests/smoke.sh` runs `contract_drift_lint.py` against the generated
+workspace as an additional check next to the existing state-writer
+coverage lint. CI will fail any future PR that introduces a vocab,
+helper-name, or subagent-permission drift in prompts or agents.
+
 ## [1.2.3] — 2026-04-25
 
 Patch release. Fixes a missing primitive on the planner agent that

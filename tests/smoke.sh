@@ -486,6 +486,9 @@ if failures:
     sys.exit(1)
 PY
 
+echo "==> contract drift: vocab values, agent dispatch, helper references"
+python3 "$REPO/tests/contract_drift_lint.py" "$TMP"
+
 echo "==> write-stage.py: enforces blocked invariant (smoke)"
 cp "$TMP/roadmap/state.md.bak" "$TMP/roadmap/state.md"
 trap - ERR
