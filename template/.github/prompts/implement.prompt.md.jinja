@@ -23,14 +23,22 @@ This prompt mirrors the canonical slice loop in `.github/agents/autonomous-build
 
 Execute every step in order. Do not skip or reorder:
 
-1. **Read the slice** from the implementation plan: files touched, scope, acceptance criteria, test strategy.
+1. **Read the slice** from the implementation plan: files touched, scope, acceptance criteria, test strategy, **Codebase Anchors**, and **Kind** (`build | wire-up | augment | audit | drop`).
 2. **Invoke tester subagent** with the spec. Tester writes tests without reading implementation (hook-enforced).
 3. **Implement the slice** — edit only the files listed in the slice plan. If the slice grows, stop and update the plan first.
 4. **Run tests**, then **write the result explicitly** with `python3 .github/hooks/scripts/write-test-evidence.py pass|fail|n/a`. On failure, apply the builder's error recovery: diagnose, fix (up to 2 attempts), otherwise record in `docs/reference/tech-debt.md` and move on.
 5. **Run post-implementation checks** from the implementation plan (stale references, config traces, diagram/prose consistency).
+5b. **Runtime check** — for any slice with `Kind: build | wire-up | augment`, produce evidence the change works on the running surface (not just that tests pass):
+    - **UI slice**: dispatch the catalog `designer` agent (or `/design-review`) to navigate + screenshot the affected page(s). The autonomous-builder cannot drive browser tools directly.
+    - **API slice**: `curl` the affected endpoint(s); capture status + a `jq` excerpt of the response shape.
+    - **CLI slice**: invoke the affected command(s); capture stdout/stderr.
+    - **Library slice with no observable surface**: write `Runtime check: n/a — <reason ≥20 chars>` (e.g., "internal refactor, no observable behavior change").
+    - **`audit` / `drop` slices**: `Runtime check: n/a — <kind> slice, no new behavior shipped`.
+
+    Append the artifact (or honest `n/a`) to the commit body in step 8 under a `Runtime check:` heading. The reviewer will look for it; silent omission is a Major finding.
 6. **Invoke reviewer subagent** on the changed files — always, regardless of file count. Reviewer writes `Review Verdict` + findings to state.md.
 7. **Fix all Critical and Major findings** before committing.
-8. **Commit**: `type(scope): description` format, one slice per commit. Then stamp commit evidence: `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty.
+8. **Commit**: `type(scope): description` format, one slice per commit. The commit body must include a `Runtime check:` block (artifact or honest `n/a`) per step 5b. Then stamp commit evidence: `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty.
 9. **Advance state**:
    - **Verify** the reviewer wrote `Reviewer Invoked: yes`, `Review Verdict: <pass|needs-fixes|needs-rework>`, `Critical Findings: N`, `Major Findings: N`. The reviewer agent is the sole writer of these fields per ADR-003 (`subagent-verdict-check.py reviewer` would have blocked otherwise). **Do not overwrite them** — if the values look wrong, re-invoke the reviewer rather than edit them by hand. The `write-commit-evidence.py` helper wrote `Committed`.
    - Increment `Active Slice` (line-shape replace is fine).
@@ -48,4 +56,5 @@ Under autopilot, do **not** ask clarifying questions. Make evidence-based decisi
 - Edit files outside the slice's declared scope.
 - Commit broken tests.
 - Skip the reviewer. Every slice gets a reviewer pass, regardless of file count.
+- Skip the runtime check on `build | wire-up | augment` slices. If the runnable surface is genuinely unreachable (no dev server, no deploy, no curl target), write an honest `Runtime check: n/a — <reason ≥20 chars>` in the commit body. Honest `n/a` is acceptable; silent omission is a Major reviewer finding.
 - Advance `Active Slice` before committing.

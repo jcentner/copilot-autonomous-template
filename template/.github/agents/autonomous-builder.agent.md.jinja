@@ -159,10 +159,18 @@ For each slice in the implementation plan:
 2. Implement the slice.
 3. Run tests. On success/failure, **write the result explicitly** with `python3 .github/hooks/scripts/write-test-evidence.py pass|fail|n/a`. If tests fail, apply **error recovery** below.
 4. Run post-implementation checks: stale references grep, config end-to-end trace, diagram/prose consistency.
-5. Invoke **reviewer** on changed files. The reviewer writes Review Verdict + findings to state.md.
-6. Fix all Critical and Major findings.
-7. `git commit` with format `type(scope): description`, then **stamp commit evidence** with `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty — do not bypass it by editing state.md directly.
-8. Verify the reviewer wrote `Reviewer Invoked: yes`, `Review Verdict`, `Critical Findings`, `Major Findings` — the reviewer is the sole writer per ADR-003, and `subagent-verdict-check.py reviewer` would have blocked otherwise. Do not overwrite those values; if they look wrong, re-invoke the reviewer rather than edit by hand. The `write-commit-evidence.py` helper wrote `Committed`. Then increment `Active Slice` (line-shape edit) and reset slice evidence fields (`Tests Written`, `Tests Pass`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings: 0`, `Major Findings: 0`, `Committed`) to `pending` / `0` so the next slice starts with a clean slate — the line-shape carve-out in `tool-guardrails.py` allows single-field edits to all of these.
+5. **Runtime check** — for any slice with `Kind: build | wire-up | augment` (per Block A vocabulary), produce evidence the change works on the running surface, not just that tests pass:
+   - **UI slice**: dispatch the catalog `designer` agent (or `/design-review` if available) to navigate the affected page(s) and screenshot. Browser tools are virtualized away from this agent; designer is the sanctioned path.
+   - **API slice**: `curl` the affected endpoint(s); capture status + a `jq` excerpt of the response shape.
+   - **CLI slice**: invoke the affected command(s); capture stdout/stderr.
+   - **Library slice with no observable surface**: write `Runtime check: n/a — <reason ≥20 chars>` (e.g., "internal refactor, no observable behavior change").
+   - **`audit` / `drop` slices**: `Runtime check: n/a — <kind> slice, no new behavior shipped`.
+
+   Append the runtime artifact (or honest `n/a`) to the commit body in step 7 under a `Runtime check:` heading. The reviewer (Block E) will look for this; silent omission is a Major finding.
+6. Invoke **reviewer** on changed files. The reviewer writes Review Verdict + findings to state.md.
+7. Fix all Critical and Major findings.
+8. `git commit` with format `type(scope): description` and a `Runtime check:` block in the body (per step 5), then **stamp commit evidence** with `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty — do not bypass it by editing state.md directly.
+9. Verify the reviewer wrote `Reviewer Invoked: yes`, `Review Verdict`, `Critical Findings`, `Major Findings` — the reviewer is the sole writer per ADR-003, and `subagent-verdict-check.py reviewer` would have blocked otherwise. Do not overwrite those values; if they look wrong, re-invoke the reviewer rather than edit by hand. The `write-commit-evidence.py` helper wrote `Committed`. Then increment `Active Slice` (line-shape edit) and reset slice evidence fields (`Tests Written`, `Tests Pass`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings: 0`, `Major Findings: 0`, `Committed`) to `pending` / `0` so the next slice starts with a clean slate — the line-shape carve-out in `tool-guardrails.py` allows single-field edits to all of these.
 
 The Stop hook (`session-gate.py`) blocks session end if Slice Evidence is incomplete during `executing`.
 
@@ -214,6 +222,7 @@ Regardless of autopilot:
 - Do not advance past `design-critique` without a critic verdict of `approve` (or human-recorded `waived`).
 - Do not edit source files outside `executing` stage (stage-gate enforces; session-gate catches terminal bypass at session end).
 - Do not skip the reviewer on any slice. Every slice gets a reviewer pass.
+- Do not skip the runtime check on `Kind: build | wire-up | augment` slices. If the runnable surface is genuinely unreachable, write an honest `Runtime check: n/a — <reason ≥20 chars>` in the commit body — the reviewer will accept honest `n/a` but blocks on silent omission.
 - Do not commit broken tests.
 - Do not declare completion without runnable evidence.
 - Do not rewrite VISION-LOCK.md to fit implementation shortcuts, or silently shrink scope.
