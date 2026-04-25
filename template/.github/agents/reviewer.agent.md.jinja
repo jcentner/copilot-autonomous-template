@@ -36,8 +36,9 @@ Consult on demand via Explore: ADRs, architecture overview, glossary.
 2. **Simplicity** — as simple as it can be while correct? unnecessary abstractions?
 3. **Test quality** — meaningful tests? happy paths and edge cases? behavior vs. implementation details?
 4. **Security** — input validation at boundaries; no injection (SQL, command, template); no hardcoded secrets; no credential leakage in logs/errors; parameterized queries; no SSRF; proper auth.
-5. **Dependency security** — known vulnerabilities in new deps? outdated packages?
-6. **Doc-sync** — run the checklist below for any slice that adds/changes user-visible capability.
+5. **Runtime evidence** — for slices with `Kind: build | wire-up | augment` (Block A vocabulary), the commit body must contain a `Runtime check:` block (per the slice loop, step 5b) with either an artifact (screenshot, curl + jq excerpt, CLI stdout) or an honest `n/a — <reason ≥20 chars>`. Silent omission is a **Major** finding tagged `runtime-evidence: missing`. Honest `n/a` is acceptable; you are not the runtime cop, you are the consistency backstop.
+6. **Dependency security** — known vulnerabilities in new deps? outdated packages?
+7. **Doc-sync** — run the checklist below for any slice that adds/changes user-visible capability.
 
 ## Doc-sync checklist (two-tier severity)
 
@@ -69,6 +70,7 @@ Write findings to `roadmap/phases/phase-N-review-slice-M.md` (N = Phase, M = Act
 |----------|-----|------|---------|----------------|
 | Critical |     | path:line | description | fix |
 | Major    |     | path:line | description | fix |
+| Major    | runtime-evidence: missing | commit body | no `Runtime check:` block on Kind=build slice | builder must run slice-loop step 5b and amend commit body |
 | Major    | doc-sync: missing | docs/x.md | description | fix before /merge-phase |
 | Minor    |     | path:line | description | fix |
 | Nit      |     | path:line | description | fix |
