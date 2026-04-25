@@ -6,6 +6,44 @@ this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] — 2026-04-25
+
+Patch release. Fixes a missing primitive on the planner agent that
+prevented it from dispatching the product-owner and critic subagents its
+own prompts told it to hand off to.
+
+### Fixed — Planner subagent dispatch
+- `planner.agent.md.jinja` now declares `agent` in `tools:` and lists
+  `product-owner` and `critic` in `agents:`. Without these, a human
+  invoking `/design-plan` (which pins `agent: planner`) hit a dead end:
+  the prompt body said "Hand off to product-owner / critic" but the
+  planner had no way to dispatch them. The previous frontmatter comment
+  conflated `handoffs:` (UI buttons humans press) with `agents:`
+  (programmatic subagent dispatch from inside a prompt body) — only
+  `handoffs:` carried the stage-bypass risk that motivated the
+  restriction.
+- The SubagentStop verdict-trailer hooks on product-owner and critic
+  still fire regardless of dispatcher, so the critique-gate guarantees
+  documented in ADR-001/ADR-003 are unchanged.
+
+### Documented — Subagent vs. autonomous-builder context
+- `/design-plan` and `/implementation-plan` Handoff sections now note
+  that nested subagent invocation is off by default
+  (`chat.subagents.allowInvocationsFromSubagents`), so when the planner
+  runs **as a subagent of autonomous-builder** the Handoff section is
+  inert — the builder owns the `planning → design-critique` and
+  `implementation-planning → implementation-critique` transitions and
+  dispatches product-owner / critic itself. Act on Handoff only when a
+  human invoked the planner directly.
+
+### Why we are not enabling nested subagent invocation
+Evaluated the trade-off and kept the default. Enabling it would let the
+planner-as-subagent dispatch critic from inside `Stage: planning`, which
+bypasses `record-verdict.py`'s round-budget counter (it runs on builder-
+driven `design-critique` transitions, not on nested critic calls). The
+asymmetry is a documentation gap, not a functional bug — the builder
+already handles the dispatches it needs.
+
 ## [1.2.2] — 2026-04-25
 
 Patch release. Fixes a `tool-guardrails.py` denial that blocked `/design-plan`

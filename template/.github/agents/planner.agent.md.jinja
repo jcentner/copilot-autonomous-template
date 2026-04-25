@@ -5,16 +5,26 @@ tools:
   - web
   - search/codebase
   - edit
+  - agent
+agents:
+  - product-owner
+  - critic
 hooks:
   SubagentStop:
     - type: command
       command: "python3 .github/hooks/scripts/subagent-verdict-check.py planner"
-# No handoffs: the planner is invoked as a subagent by the autonomous-builder,
-# which itself dispatches the critic and product-owner at the right Stage
-# (`design-critique` / `implementation-critique`). Adding handoff buttons here
-# would let a human run the critic from `Stage: planning`, where
-# `subagent-verdict-check.py critic` does not enforce the verdict-trailer
-# requirement — silently degrading the critique gate.
+# `agents:` lists subagents the planner may dispatch from inside its workflow
+# (e.g. /design-plan hands off to product-owner for User Stories, then to
+# critic for adversarial review). The SubagentStop hook on each of those
+# agents (`subagent-verdict-check.py product-owner` / `... critic`) still
+# enforces the verdict-trailer requirement regardless of who dispatched
+# them, so this is safe.
+#
+# `handoffs:` is intentionally NOT set: handoff buttons would let a human
+# press "critic" at the wrong Stage (e.g. from `Stage: planning` instead of
+# `Stage: design-critique`), bypassing the autonomous-builder's stage
+# gating. Subagent dispatch from inside a prompt body is bounded by the
+# prompt's own workflow.
 ---
 
 # Planner — {{ project_name }}

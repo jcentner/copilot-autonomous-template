@@ -80,6 +80,8 @@ All three are required. `Slice Total` ships as `n/a` and the reviewer agent read
 
 Hand off to **critic** for adversarial review (max 2 rounds). On approve, the builder will set Stage to `executing`.
 
+> **If you are the planner subagent dispatched by `autonomous-builder`, skip this section.** Nested subagent invocation is disabled by default and the builder owns the `implementation-planning → implementation-critique` transition. It will dispatch critic itself once it sees `Implementation Status: draft`. Act on the Handoff section only when a human invoked you directly via `/implementation-plan`.
+
 ## Rules
 
 - Do not write code. This is a planning artifact.
