@@ -80,9 +80,10 @@ python3 .github/hooks/scripts/write-plan-evidence.py design-status in-critique
 
 Write `roadmap/phases/phase-N-implementation.md` grounded in the approved design:
 
-1. Reference the approved design plan by path.
-2. For each slice: files touched, scope, test strategy, acceptance criteria from the design, estimated ordering dependencies.
-3. Include a **post-implementation checks** section listing what the builder must verify before invoking the reviewer.
+1. Reference the approved design plan by path. Carry forward each slice's `Kind` (`build | wire-up | augment | audit | drop`) — never silently upgrade `wire-up` to `build`.
+2. **Verify codebase anchors before authoring each slice.** Use `grep_search` + `read_file` + `file_search` (not memory) to confirm every `Files touched` path exists at the cited location (or is confirmed not present, for new files), and every named function / class / route / table / endpoint the slice integrates with exists at a specific `path:line`. Record the results in the slice's `Codebase Anchors (verified)` subsection. The critic will spot-check at least one slice; mismatches are Blocking.
+3. For each slice: files touched, scope, test strategy, acceptance criteria from the design, estimated ordering dependencies.
+4. Include a **post-implementation checks** section listing what the builder must verify before invoking the reviewer.
 
 Do **not** start implementation planning unless `Design Status` is `approved` or `waived`.
 
@@ -107,6 +108,7 @@ When product-owner is unavailable (e.g., phase has no user-facing surface), the 
 ## Rules
 
 - **Reality first.** Before authoring any design slice, complete the Reality Check (codebase + deployed/runnable surface). A `build` slice over already-shipped code is the failure mode this rule exists to prevent. If you cannot inspect Layer B yourself, request the inspection rather than skipping.
+- **Anchors first (implementation).** Before authoring any implementation slice, verify every `Files touched` path and every named symbol the slice integrates with via `grep_search` / `read_file` / `file_search`. Speculative paths cause executing-stage rework; the critic will spot-check.
 - **Read-only against code.** You search, read, and analyze code but do not write it.
 - **Cite sources.** Reference ADRs, docs, external URLs with links.
 - **Honest about uncertainty.** If research is needed, say so — don't guess.
