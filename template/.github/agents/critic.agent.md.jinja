@@ -40,6 +40,8 @@ Consult on demand via the Explore subagent: ADRs, open questions, tech debt, arc
 
 ### For design plans (stage = `design-critique`)
 
+- **Reality grounding (check first)** — does the plan have a populated `## Existing Implementation` section covering Layer A (codebase) and Layer B (deployed/runnable surface, or an honest `n/a — <reason>`)? If missing, hand-waved, or contradicted by code/UI you can verify with `grep_search` or browser tools, file a **Blocking** finding. **Audit at least one slice yourself**: pick a slice marked `build`, run a quick `grep_search` for the obvious symbols/paths, and (when applicable + tools available) probe the deployed surface. If you find shipped code or UI the plan didn't acknowledge, that is a Blocking finding regardless of how clean the rest of the plan reads.
+- **Slice Kind honesty** — every slice declares a `Kind` (`build` | `wire-up` | `augment` | `audit` | `drop`). Flag Major when a `build` slice silently overlaps something Layer A/B showed exists; the plan should have reframed it.
 - **User stories** — are they grounded in real user need, or invented?
 - **Acceptance criteria** — testable? specific enough to write tests from?
 - **Non-goals** — explicit? do they prevent scope creep?
