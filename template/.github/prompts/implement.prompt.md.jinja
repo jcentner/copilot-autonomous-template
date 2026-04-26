@@ -1,11 +1,11 @@
 ---
-description: "Execute a slice from the current implementation plan using the builder's slice loop."
+description: "Execute one slice of the approved implementation plan by dispatching the slice-runner subagent."
 agent: autonomous-builder
 ---
 
 # Implement
 
-You are executing one slice of the approved implementation plan for {{ project_name }}. This prompt is a manual override entry point — the autonomous builder normally drives the slice loop.
+You are executing one slice of the approved implementation plan for {{ project_name }}. This prompt is a **manual override entry point** — the autonomous builder normally drives `executing` automatically by dispatching `slice-runner` per slice.
 
 ## Precondition
 
@@ -17,45 +17,33 @@ You are executing one slice of the approved implementation plan for {{ project_n
 
 Slice number (defaults to **Active Slice** from state.md): **${input:sliceNumber}**
 
-## Slice loop
+## What to do
 
-This prompt mirrors the canonical slice loop in `.github/agents/autonomous-builder.agent.md` (section "The slice loop"). If the two ever disagree, the builder agent is authoritative.
+**Dispatch the `slice-runner` subagent** with the slice number above and the slice section from the implementation plan. Slice-runner owns the canonical 9-step loop:
 
-Execute every step in order. Do not skip or reorder:
+1. Read slice → 2. Tester subagent → 3. Implement → 4. Run tests + stamp evidence → 5. Post-implementation checks → 6. Runtime check (Kind: build|wire-up|augment) → 7. Reviewer subagent + fix Critical/Major → 8. Commit + stamp commit evidence → 9. Advance Active Slice + reset slice evidence (or escalate to `Stage: blocked` on rework / unrecoverable failure).
 
-1. **Read the slice** from the implementation plan: files touched, scope, acceptance criteria, test strategy, **Codebase Anchors**, and **Kind** (`build | wire-up | augment | audit | drop`).
-2. **Invoke tester subagent** with the spec. Tester writes tests without reading implementation (hook-enforced).
-3. **Implement the slice** — edit only the files listed in the slice plan. If the slice grows, stop and update the plan first.
-4. **Run tests**, then **write the result explicitly** with `python3 .github/hooks/scripts/write-test-evidence.py pass|fail|n/a`. On failure, apply the builder's error recovery: diagnose, fix (up to 2 attempts), otherwise record in `docs/reference/tech-debt.md` and move on.
-5. **Run post-implementation checks** from the implementation plan (stale references, config traces, diagram/prose consistency).
-5b. **Runtime check** — for any slice with `Kind: build | wire-up | augment`, produce evidence the change works on the running surface (not just that tests pass):
-    - **UI slice**: dispatch the catalog `designer` agent (or `/design-review`) to navigate + screenshot the affected page(s). The autonomous-builder cannot drive browser tools directly.
-      - **If `designer` is not activated**: append `RECOMMEND: /catalog-review activate designer` to the commit body and write `Runtime check: n/a — designer not activated; activating before next UI slice`. Reviewer accepts this once per project; a second consecutive UI slice with no designer is a Major finding.
-    - **API slice**: `curl` the affected endpoint(s); capture status + a `jq` excerpt of the response shape.
-    - **CLI slice**: invoke the affected command(s); capture stdout/stderr.
-    - **Library slice with no observable surface**: write `Runtime check: n/a — <reason ≥20 chars>` (e.g., "internal refactor, no observable behavior change").
-    - **`audit` / `drop` slices**: `Runtime check: n/a — <kind> slice, no new behavior shipped`.
+The full contract lives in [.github/agents/slice-runner.agent.md](../agents/slice-runner.agent.md). If you are tempted to inline any of those steps here, stop — re-dispatch slice-runner instead. Drift between this prompt and slice-runner is the bug we are explicitly avoiding.
 
-    Append the artifact (or honest `n/a`) to the commit body in step 8 under a `Runtime check:` heading. The reviewer will look for it; silent omission is a Major finding.
-6. **Invoke reviewer subagent** on the changed files — always, regardless of file count. Reviewer writes `Review Verdict` + findings to state.md.
-7. **Fix all Critical and Major findings** before committing.
-8. **Commit**: `type(scope): description` format, one slice per commit. The commit body must include a `Runtime check:` block (artifact or honest `n/a`) per step 5b. Then stamp commit evidence: `python3 .github/hooks/scripts/write-commit-evidence.py yes`. The helper refuses to mark `Committed: yes` if the working tree is dirty.
-9. **Advance state**:
-   - **Verify** the reviewer wrote `Reviewer Invoked: yes`, `Review Verdict: <pass|needs-fixes|needs-rework>`, `Critical Findings: N`, `Major Findings: N`. The reviewer agent is the sole writer of these fields per ADR-003 (`subagent-verdict-check.py reviewer` would have blocked otherwise). **Do not overwrite them** — if the values look wrong, re-invoke the reviewer rather than edit them by hand. The `write-commit-evidence.py` helper wrote `Committed`.
-   - Increment `Active Slice` (line-shape replace is fine).
-   - Reset slice evidence for the next slice: `Tests Written: pending`, `Tests Pass: pending`, `Reviewer Invoked: pending`, `Review Verdict: pending`, `Critical Findings: 0`, `Major Findings: 0`, `Committed: pending`. (`tool-guardrails.py`'s line-shape carve-out allows single-field edits to all of these; only `Stage` / `Blocked Kind` / `Blocked Reason` require a helper.)
-   - On the next slice, rerun `write-test-evidence.py` as soon as you have a result. That helper stamps `Evidence For Slice` to the current `Active Slice`; `session-gate` blocks stop while `Evidence For Slice != Active Slice` — the hook-enforced backstop on the manual reset above.
+## Setting requirement
 
-The Stop hook (`session-gate.py`) blocks session end if Slice Evidence is incomplete during `executing`.
+Slice-runner dispatches `tester` and `reviewer` as nested subagents (depth 2). This requires `chat.subagents.allowInvocationsFromSubagents: true` (default `false`). BOOTSTRAP.md prompts the human to enable it on first run. If a slice-runner dispatch immediately fails with a nesting error, that setting is the first thing to check.
+
+## After slice-runner returns
+
+Re-read `roadmap/state.md`:
+
+- If `Active Slice` advanced (or pinned at `Slice Total` for the final slice) and the working tree is clean → the slice succeeded. Stop, or loop the orchestrator to dispatch slice-runner for the next slice.
+- If `Stage` is `blocked` → stop. The next session uses `/resume` to route on `Blocked Kind`.
+- If neither: slice-runner returned without satisfying its return contract. Re-invoke it with the same slice number and a note about what went wrong; the `session-gate.py` Stop hook will block stop until the contract is met.
 
 ## Autopilot behavior
 
-Under autopilot, do **not** ask clarifying questions. Make evidence-based decisions, append rationale to `## Context` in `CURRENT-STATE.md`, and record architectural choices as ADRs. Stage-gate and tool-guardrails hooks remain hard constraints.
+Under autopilot, do **not** ask clarifying questions. Make evidence-based decisions, append rationale to `## Context` in `CURRENT-STATE.md`, and record architectural choices as ADRs. Stage-gate, tool-guardrails, and branch-gate hooks remain hard constraints regardless of autopilot.
 
 ## Do not
 
-- Edit files outside the slice's declared scope.
-- Commit broken tests.
-- Skip the reviewer. Every slice gets a reviewer pass, regardless of file count.
-- Skip the runtime check on `build | wire-up | augment` slices. If the runnable surface is genuinely unreachable (no dev server, no deploy, no curl target), write an honest `Runtime check: n/a — <reason ≥20 chars>` in the commit body. Honest `n/a` is acceptable; silent omission is a Major reviewer finding.
-- Advance `Active Slice` before committing.
+- Re-implement the slice loop in this prompt — dispatch slice-runner.
+- Edit files outside the slice's declared scope (slice-runner enforces this; the orchestrator should not work around it).
+- Skip the reviewer or runtime check — slice-runner enforces both.
+- Advance `Active Slice` from this prompt — slice-runner owns that field during `executing`.

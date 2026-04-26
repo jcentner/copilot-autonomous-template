@@ -61,6 +61,18 @@ Write the answer to `roadmap/state.md`:
 
 This can be edited later in `roadmap/state.md` if the workflow changes.
 
+## Step 4.5 — Enable nested subagents
+
+The autonomous-builder dispatches the `slice-runner` subagent during `executing`, and `slice-runner` itself dispatches `tester` and `reviewer` (depth-2 nesting). VS Code disables nested subagents by default.
+
+Use `vscode_askQuestions` once to surface this setting:
+
+> The autonomous workflow uses nested subagents (autonomous-builder → slice-runner → tester / reviewer). Enable `chat.subagents.allowInvocationsFromSubagents` in your VS Code settings? (Recommended: yes — without it, every slice will fail at the tester/reviewer dispatch.)
+
+If the human approves, run `run_vscode_command` with `workbench.action.openSettingsJson` and instruct them to add `"chat.subagents.allowInvocationsFromSubagents": true`. Confirm by reading the file back. (You cannot write `settings.json` directly — `tool-guardrails.py` does not protect it, but VS Code expects user-owned config to be edited by the user.) If they decline, write a one-line warning to `roadmap/CURRENT-STATE.md` `## Context` so the first `executing` session knows why dispatches will fail.
+
+This is also documented in [.github/agents/slice-runner.agent.md](.github/agents/slice-runner.agent.md) for future reference.
+
 ## Step 5 — Catalog selection
 
 Use `vscode_askQuestions` once to ask the human which catalog items to activate. Show the list from `.github/catalog/MANIFEST.md` grouped by type. Copy each selected file from `.github/catalog/<type>/` to `.github/<type>/`. Do not apply heuristics — the human decides.
@@ -77,7 +89,7 @@ Order matters here. The Stop hook diffs the working tree against `HEAD` and refu
 2. Save a repo-memory note at `/memories/repo/bootstrap.md` summarizing the vision and tech stack.
 3. Delete this file (`BOOTSTRAP.md`). After this session, it should not exist.
 4. `git add -A && git commit -m "bootstrap: vision, merge mode, catalog activation"` so the working tree is clean. (Branch-gate is exempt during `bootstrap` stage, so this commit on `main` is allowed; subsequent stages must use feature branches.)
-5. **Cut a strategy branch before flipping Stage.** Run `git checkout -b strategy/$(date -u +%Y%m%d)` so the next session's first commit doesn't fight `branch-gate.py` (which denies commits to `main`/`master`/`trunk`/`prod` once Stage leaves `bootstrap`). The strategy branch is short-lived: `/strategize` will direct you to cut a `phase/N-<theme>` branch as soon as a phase is picked.
+5. **Cut a strategy branch before flipping Stage.** Run `python3 .github/hooks/scripts/cut-branch.py strategy` so the next session's first commit doesn't fight `branch-gate.py` (which denies commits to `main`/`master`/`trunk`/`prod` once Stage leaves `bootstrap`). The helper refuses on a dirty tree, so step 4 must complete first. The strategy branch is short-lived: the strategist subagent will direct the next session to cut a `phase/N-<theme>` branch (also via `cut-branch.py`) as soon as a phase is picked.
 6. **Last:** set `roadmap/state.md` `Stage: strategy`, `Blocked Kind: n/a`, `Next Prompt: /strategize`, then commit that single state.md change. The Stage flip must be the final mutation, on a clean tree.
 
 The next session resumes from `Stage: strategy` — the strategize prompt (added in v1.2 / Block 2) will read the vision, present candidate phases (with optional `/research` recommendations from Step 3.5), and ask the human to pick one before any design work begins.

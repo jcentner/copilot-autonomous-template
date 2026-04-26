@@ -21,12 +21,15 @@ Core (shipped by default):
 
 | Agent | Role |
 |-------|------|
-| `autonomous-builder` | Stage orchestrator. Dispatches subagents based on `Stage` in state.md. |
-| `planner` | Design plans, implementation plans, revisions, strategic-review fallback. Read + plan-file writes. |
+| `autonomous-builder` | Stage orchestrator. Reads `Stage` in state.md, dispatches the owning subagent, advances state on return, loops. |
+| `strategist` | Owns `Stage: strategy`. Grounded candidates, ranks, picks (under autopilot) or asks (manual), writes artifact, cuts phase branch. |
+| `planner` | Owns `Stage: planning` (design plan) + `implementation-planning` (impl plan). Also handles design/impl-critique revisions and strategic-review fallback. |
 | `critic` | Adversarial review of design + implementation plans. SubagentStop-verified verdict. |
-| `product-owner` | User stories (design mode) / strategic review (review mode). SubagentStop-verified. |
-| `reviewer` | Code review + security + docs-sync. SubagentStop-verified verdict. |
-| `tester` | Writes tests from spec without reading implementation. Isolation hook-enforced. |
+| `product-owner` | User stories (design mode) during `design-critique`; strategic review (review mode) owning `Stage: reviewing`. |
+| `slice-runner` | Owns `Stage: executing`. Dispatched once per slice. Internally dispatches `tester` and `reviewer` (depth-2 nesting; needs `chat.subagents.allowInvocationsFromSubagents`). |
+| `phase-completer` | Owns `Stage: cleanup`. Acceptance criteria, ADRs, doc-sync, wrap, vision check, merge-gate handoff. |
+| `reviewer` | Per-slice code review + security + docs-sync. Invoked **by `slice-runner`**, not directly by the orchestrator. SubagentStop-verified verdict. |
+| `tester` | Writes tests from spec without reading implementation. Invoked **by `slice-runner`**. Isolation hook-enforced. |
 | `researcher` | Web research + comparative analysis. Produces durable `docs/reference/<topic>.md` from cited public sources. NO terminal access (anti-injection). Verified caller-side, not by hook (see ADR-010). |
 
 Catalog (activated on demand at bootstrap):
@@ -53,7 +56,13 @@ The `blocked` steps on this line are **scheduled** interruptions for human appro
 
 After any `blocked` session, run `/resume` to route on `Blocked Kind`. The session-gate hook refuses to allow a session to stop with `Stage: blocked` unless `Blocked Kind` is one of the values above — “blocked with no reason” is not a valid exit. The Stop hook also surfaces the `Next Prompt` field on every stop, so you don't need to remember which slash-command comes next.
 
-Three hard human gates under autopilot: **strategy approval** (when escaped), **design plan approval**, and **merge approval**. All hook-enforced via `Stage: blocked` + specific `Blocked Kind` values.
+Three categories of human gate, gated by the `Autopilot` field in `roadmap/state.md`:
+
+- **Soft gates** (bypassed under `Autopilot: on`): strategy candidate pick (when escaped to "save and let me think"), design-plan approval after critic verdict.
+- **Hard gate** (always pauses): merge approval (`awaiting-merge-approval`). The autonomous loop never runs `git push` / `gh pr create`.
+- **Escalation blocks** (always pause regardless of autopilot): `awaiting-vision-update`, `awaiting-human-decision`, `error`, `vision-exhausted`.
+
+All hook-enforced via `Stage: blocked` + specific `Blocked Kind` values.
 
 ## When to use the autonomous builder
 

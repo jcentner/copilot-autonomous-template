@@ -1,86 +1,42 @@
 ---
-description: "Strategic post-implementation review: did what shipped match the design's intent and acceptance criteria?"
-agent: product-owner
+description: "Run the strategic review by dispatching the product-owner subagent in review mode. Manual override entry point — the autonomous-builder normally drives this automatically when entering Stage: reviewing."
+agent: autonomous-builder
 ---
 
 # Strategic Review
 
-You are validating that the implementation of the current phase of {{ project_name }} matches the design's intent. This complements `/code-review` (which is code-quality only).
-
-If the **product-owner** agent is not active in this repo, the **planner** performs this role as a fallback.
+You are validating that the implementation of the current phase of {{ project_name }} matches the design's intent. This complements `/code-review` (which is per-slice code quality only).
 
 ## Precondition
 
-- Read `roadmap/state.md`.
-- Verify **Stage** is `reviewing` (or `cleanup` if catching up late). If earlier, stop and report the stage.
-- Note the **Design Plan** and **Implementation Plan** paths.
+1. Read `roadmap/state.md`.
+2. **Stage** should be `reviewing` (or `cleanup` if catching up late). If earlier, stop and report.
 
-## Required reads
+## What to do
 
-- The approved design plan (for acceptance criteria + user stories).
-- The implementation plan (for slice-level scope).
-- Slice review files under `roadmap/phases/phase-N-review-slice-*.md`.
-- The phase's commit range (`git log phase-N-start..HEAD`).
+**Dispatch the `product-owner` subagent.** Its review mode owns:
 
-## Questions to answer
+- Walking each acceptance criterion in the approved design plan.
+- For UI/API/CLI phases, observing the runnable surface (dispatching `designer` for browser walkthroughs; running probes via the orchestrator for API/CLI).
+- Writing `roadmap/phases/phase-N-strategic-review.md` with criterion table, scope drift, invalidated assumptions, emergent constraints.
+- Setting `Strategic Review` to `pass` / `replan` / `n/a` in state.md (the SubagentStop hook verifies this terminal value).
+- On `replan`: setting `Stage: blocked`, `Blocked Kind: awaiting-human-decision`, `Next Prompt: /resume` itself — `session-gate` only blocks on `Strategic Review: pending`, not on `Strategic Review: replan`, so the explicit block transition matters.
 
-1. **Acceptance criteria** — were all criteria from the design plan met? Which ones are only partially met?
-2. **User stories** — do the shipped capabilities satisfy the stories? Any stories silently dropped?
-3. **Invalidated assumptions** — did any test result, user story revision, or external change invalidate a design assumption?
-4. **Emergent constraints** — are there newly-discovered constraints (perf, security, UX, integration) that warrant a vision update or a new ADR?
-5. **Scope drift** — did the implementation add or drop non-trivial scope vs. the design? Was it recorded?
+If the **product-owner** subagent is not active in this repo (rare; product-owner is a v1.2+ core agent), the **planner** performs this role as a fallback. Dispatch planner with an explicit "review mode" prompt instead.
 
-## Output
+The full contract lives in [.github/agents/product-owner.agent.md](../agents/product-owner.agent.md) `## Review mode`. Do not re-implement here.
 
-Write `roadmap/phases/phase-N-strategic-review.md`:
+## After product-owner returns
 
-```markdown
-# Phase N — Strategic Review
+Re-read `roadmap/state.md`:
 
-**Design reference**: link.
-**Implementation reference**: link.
-
-## Acceptance Criteria
-| Criterion | Met? | Evidence |
-|-----------|------|----------|
-| ...       | yes/no/partial | commit/test/doc |
-
-## User Stories
-| Story | Satisfied? | Notes |
-|-------|------------|-------|
-
-## Invalidated Assumptions
-- ...
-
-## Emergent Constraints
-- ...
-
-## Scope Drift
-- Added: ...
-- Dropped: ...
-
-**Verdict**: pass | replan | n/a
-**Rationale**: one sentence.
-```
-
-Verdict rules:
-- `pass` — all criteria met or consciously waived; no invalidated assumptions.
-- `replan` — criteria missed, or new constraints invalidate the design; recommend a new phase or ADR.
-- `n/a` — this phase has no user-facing surface (pure refactor, infra-only).
-
-## Update CURRENT-STATE
-
-Set **Strategic Review** in `roadmap/state.md` to `pass`, `replan`, or `n/a` (the SubagentStop hook verifies this terminal value).
-
-If verdict is `replan`, set the full block transition yourself — do not defer to "the builder." `session-gate` only blocks stop on `Strategic Review: pending`, so without these writes the agent could stop at `Stage: reviewing` with `replan` and no `/resume` cue surfaced to the human:
-
-- `Stage: blocked`
-- `Blocked Kind: awaiting-human-decision`
-- `Blocked Reason: "<one-line summary of why a replan is needed; reference the criteria that missed>"`
-- `Next Prompt: /resume`
+- `Strategic Review: pass` (or `n/a`) → review succeeded. The orchestrator advances to `cleanup` via `write-stage.py cleanup --next-prompt /phase-complete`.
+- `Strategic Review: replan` and `Stage: blocked` → product-owner escalated. `/resume awaiting-human-decision` next session.
+- `Strategic Review: pending` → product-owner didn't satisfy its return contract; re-dispatch.
 
 ## Rules
 
-- Do not modify source. You report; the builder adjusts.
-- Do not relitigate code quality — that's `/code-review`.
-- Be honest about partial satisfaction; `partial` on a criterion is not a failure, it is information.
+- Do not modify source. The product-owner reports; the orchestrator (or next phase) adjusts.
+- Do not relitigate code quality — that's `/code-review` per-slice.
+- Be honest about partial satisfaction; `partial` on a criterion is information, not a failure.
+- For UI/API/CLI phases, runtime observation is required — `Runtime observation: n/a — <reason>` is acceptable only when there is genuinely no runnable surface.

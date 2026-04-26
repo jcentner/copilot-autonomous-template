@@ -1,133 +1,204 @@
 # {{ project_name }} — Prompt & Agent Guide
 
-## Primary Workflow: Autonomous Builder
+## How this works (read once)
 
-The **autonomous-builder** agent is the primary development workflow. Select it in the Chat agent picker or run it as a Copilot CLI session.
+The development workflow is **driven by one orchestrator** — the [`autonomous-builder`](../agents/autonomous-builder.agent.md) agent — that reads `roadmap/state.md`, dispatches the subagent that owns the current `Stage`, and loops. You do not run a different prompt for each stage; the orchestrator does.
+
+Prompts (`/`-commands) exist for two reasons:
+
+1. **Manual override**: invoke a stage's owning subagent directly when the orchestrator isn't running, or when you're debugging one step.
+2. **Human-only entry points**: actions an autonomous loop can't take on its own — research, vision changes, scrap, catalog activation, the merge handshake.
+
+You almost never type a stage prompt. You select the autonomous-builder, describe your goal, and it drives.
+
+## Primary workflow: select the autonomous-builder
 
 ```
 VS Code Chat → Agent picker → autonomous-builder → describe your goal
 ```
 
-Or with Copilot CLI (background, worktree-isolated):
+Or, for background execution, run it as a Copilot CLI session.
+
+The orchestrator reads `roadmap/state.md`, picks up where it left off, and loops:
 
 ```
-VS Code Chat → Session Target → Copilot CLI → select autonomous-builder agent → describe your goal
+read Stage → dispatch owning subagent → re-read Stage → advance / loop / stop
 ```
 
-The builder reads `roadmap/state.md` (and the narrative in `roadmap/CURRENT-STATE.md`), picks up where it left off, and runs a continuous loop: plan → implement → test → review → commit → checkpoint. It uses subagents for research (planner), testing (tester), and per-slice review (reviewer).
+The subagent for each stage owns that stage's full protocol. The orchestrator does not re-implement any of it.
 
 ### First session (greenfield or existing)
 
-On the first session, the builder reads `BOOTSTRAP.md` from the project root. It detects whether this is a new project (no code) or an existing one (has code):
+On the first run, the orchestrator reads `BOOTSTRAP.md` from the project root:
 
-- **Greenfield**: The builder interviews you interactively — what you're building, for whom, with what tech, and what's in v1.
-- **Existing project**: The builder scans your code, docs, and dependencies to synthesize the vision automatically.
+- **Greenfield**: dispatches the planner subagent for a deep-interview vision draft.
+- **Existing project**: dispatches the planner for a codebase-synthesis vision draft.
 
-Both paths produce a vision lock, Phase 1 plan, stack skills, and initial ADRs. Then `BOOTSTRAP.md` is deleted and never loaded again.
+BOOTSTRAP also asks you to enable `chat.subagents.allowInvocationsFromSubagents` (required for `slice-runner` to dispatch tester/reviewer), pick a `Merge Mode`, and activate any catalog items. Then it cuts a strategy branch and deletes itself.
 
-### Autopilot settings
+## Required VS Code settings
 
-For fully autonomous sessions, enable these VS Code settings:
+| Setting | Value | Why |
+|---------|-------|-----|
+| `chat.useCustomAgentHooks` | `true` | Enables Stop / PreToolUse / PostToolUse / SubagentStop hooks. Without it, no stage gating, no isolation enforcement, no evidence verification. |
+| `chat.subagents.allowInvocationsFromSubagents` | `true` | Required for nesting (orchestrator → slice-runner → tester/reviewer). Without it, every executing slice fails at depth 2. BOOTSTRAP prompts you for this. |
+| `chat.autopilot.enabled` (optional) | `true` | Per-tool-call auto-confirmation. Combine with workflow-level `Autopilot: on` in `roadmap/state.md` for fully heads-down sessions. |
 
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| `chat.autopilot.enabled` | `true` | Auto-approve + auto-respond |
-| `chat.useCustomAgentHooks` | `true` | Enable Stop / PreToolUse / PostToolUse / SubagentStop hooks (required) |
+## Two layers of autopilot
 
-## Manual Override Prompts
+There are two separate "autopilot" switches; they're independent.
 
-Prompts are **human override entry points**. The autonomous builder orchestrates the full pipeline; you invoke prompts directly only when driving a single step manually or recovering from an interrupted run. Type `/` in Chat to invoke.
+| Switch | Lives in | Controls |
+|--------|----------|----------|
+| `chat.autopilot.enabled` | VS Code settings | Whether tool calls auto-confirm (no per-call human click). |
+| `Autopilot` field in `roadmap/state.md` | Workflow state | Whether the orchestrator pauses at the soft human gates (strategy candidate pick, design approval). |
 
-Prompts without a dedicated subagent in the **Agent** column **inherit the currently selected agent** (typically `autonomous-builder`). Only `/design-plan`, `/implementation-plan`, `/code-review`, and `/strategic-review` dispatch to a specific subagent.
+The merge gate (`awaiting-merge-approval`) **always** pauses regardless of either switch — autopilot cannot do the human's `git push` / `gh pr create`. Vision update, human-decision, and error blocks also always pause.
 
-| Prompt | What it does | Stage it fits | Agent |
-|--------|--------------|---------------|-------|
-| `/strategize` | Pick the next phase from grounded candidates; writes `roadmap/strategy-YYYYMMDD-HHMMSSZ.md`; flips to `planning` on approval or to `blocked` (`awaiting-strategy-approval`) on escape | `strategy` | *(inherits)* |
-| `/research` | Dispatch the researcher subagent on a topic; produces `docs/reference/<topic>.md` with cited public sources | any (side-quest) | *(inherits)* |
-| `/vision-expand` | Brainstorm next directions after current vision is fulfilled | `complete` / post-vision | *(inherits)* |
-| `/design-plan` | Produce user stories, acceptance criteria, non-goals, risks, ADR candidates, test strategy, slice breakdown | `planning` | planner |
-| `/implementation-plan` | Convert an approved design into a file-by-file slice plan | `implementation-planning` | planner |
-| `/implement` | Execute one slice of the approved implementation plan via the slice loop | `executing` | *(inherits)* |
-| `/code-review` | Per-slice code review: architecture, quality, tests, docs-sync (warning), security | `executing` (per slice) | reviewer |
-| `/strategic-review` | Phase-level strategic review ("did we build the right thing?") | `reviewing` | product-owner |
-| `/phase-complete` | Cleanup checklist: ADRs, docs, wrap summary, advance state machine | `cleanup` | *(inherits)* |
-| `/merge-phase` | Prepare phase merge per `Merge Mode` (`cli` prints commands; `pr` prints `gh` invocation or compare URL); flips to `blocked` (`awaiting-merge-approval`); never executes the merge | `cleanup` → merge gate | *(inherits)* |
-| `/resume` | Unblock a session by routing on `Blocked Kind` (strategy / design / merge approval, vision update, scrap, error) | `blocked` | *(inherits)* |
+Flip workflow-level autopilot by editing `roadmap/state.md` once: change `- **Autopilot**: off` to `on`. The line-shape carve-out in `tool-guardrails.py` allows it.
 
-Each prompt reads and writes machine-readable fields in `roadmap/state.md`. SubagentStop and PreToolUse hooks verify that writes happened correctly.
+| Mode you want | Copilot autopilot | Workflow autopilot |
+|---|---|---|
+| Heads-down session, trust the loop | ON | `on` |
+| Heads-down execution, but I want to review the design before code | ON | `off` |
+| Reviewing each tool call, learning the system | OFF | `off` |
 
-## Custom Agents
+## Agents
 
-### Core (shipped by default)
+### Stage owners (each Stage has exactly one)
 
-| Agent | Role | Tools | Used as |
-|-------|------|-------|---------|
-| `autonomous-builder` | Stage orchestrator; dispatches subagents by stage | All tools + Stop hook | Primary agent |
-| `planner` | Design plans, implementation plans, revisions, strategic-review fallback | Read + plan-file writes | Subagent |
-| `critic` | Adversarial review of design + implementation plans | Read + plan-file writes | Subagent |
-| `product-owner` | User stories (design mode) / strategic review (review mode) | Read + plan-file writes | Subagent |
-| `reviewer` | Code review + security + docs-sync (two-tier: warn per slice, block at merge) | Read + state writes | Subagent |
-| `tester` | Writes tests from spec without reading implementation | Scoped via `tester-isolation.py` | Subagent |
-| `researcher` | Public-source web research producing cited reference docs | Fetch/search/read/edit — **no terminal** (anti-injection) | Subagent |
+| Stage | Owning subagent | What it produces |
+|-------|-----------------|------------------|
+| `bootstrap` | (BOOTSTRAP.md, no agent) | Vision lock, merge mode, catalog activation, strategy branch |
+| `strategy` | [`strategist`](../agents/strategist.agent.md) | Strategy artifact, phase branch, advance to `planning` |
+| `planning` | [`planner`](../agents/planner.agent.md) (planning mode) | `roadmap/phases/phase-N-design.md` with Reality Check |
+| `design-critique` | [`product-owner`](../agents/product-owner.agent.md) (design mode) → [`critic`](../agents/critic.agent.md) | User stories on the design plan + critique artifact + verdict |
+| `implementation-planning` | `planner` (implementation mode) | `roadmap/phases/phase-N-implementation.md` with verified anchors |
+| `implementation-critique` | `critic` | Critique artifact + verdict; `record-verdict.py` advances to `executing` |
+| `executing` | [`slice-runner`](../agents/slice-runner.agent.md) (once per slice) | Tests + implementation + runtime check + reviewer + commit, per slice |
+| `reviewing` | `product-owner` (review mode) | Strategic review artifact; verdict to `pass`/`replan`/`n/a` |
+| `cleanup` | [`phase-completer`](../agents/phase-completer.agent.md) | ADRs, doc-sync, wrap summary, merge-gate handoff |
+| `blocked` | (no agent — stop) | — |
+| `complete` | (no agent — stop) | — |
 
-### Catalog agents (activated on demand)
+### Per-slice helpers (invoked by slice-runner, not the orchestrator)
 
-Live in `.github/catalog/agents/`. Activated by the builder when project characteristics match. See `.github/catalog/MANIFEST.md`.
+| Agent | Role | When |
+|-------|------|------|
+| [`tester`](../agents/tester.agent.md) | Writes tests from spec without reading implementation. `tester-isolation.py` enforces. | Step 2 of slice loop |
+| [`reviewer`](../agents/reviewer.agent.md) | Per-slice code review + security + doc-sync (warning per slice; merge gate blocks). | Step 7 of slice loop |
 
-| Agent | Role | Trigger |
-|-------|------|---------|
-| `designer` | Visual design system via DESIGN.md | Project has frontend/UI code |
+### On-demand
+
+| Agent | Role | Invoked by |
+|-------|------|-----------|
+| [`researcher`](../agents/researcher.agent.md) | Public-source web research producing cited `docs/reference/<topic>.md`. NO terminal access. | `/research <topic>`, or directly when strategist/critic flag an external system without grounding |
+| `Explore` (built-in) | Broad read-only searches without polluting main context | Any agent |
+
+### Catalog (activated on demand at bootstrap)
+
+Live in `.github/catalog/agents/`. Copy via `/catalog-review activate <name>`.
+
+| Agent | Role | When to activate |
+|-------|------|------------------|
+| `designer` | DESIGN.md visual system + browser walkthroughs | Project has frontend/UI; required for the slice loop's runtime check on UI slices |
 | `security-reviewer` | OWASP, secrets, auth/authz audit | Project handles auth, payments, or PII |
 
-Agents support **handoffs** — the planner has a button to hand off to implementation, the reviewer has a button to hand off to fix issues.
+## Prompts
 
-## How It All Fits Together
+Prompts are `/` slash-commands you type in chat. They split into three groups.
 
-```
-┌─────────────────────────────────────────────────┐
-│  autonomous-builder (Autopilot / Copilot CLI)   │
-│                                                 │
-│  ┌─────────┐  ┌──────────┐  ┌────────────────┐ │
-│  │ planner  │  │  tester  │  │    reviewer    │ │
-│  │ (research│  │ (tests   │  │ (code review + │ │
-│  │  only)   │  │  from    │  │  security)     │ │
-│  │          │  │  spec)   │  │                │ │
-│  └─────────┘  └──────────┘  └────────────────┘ │
-│                                                 │
-│  Core subagents: planner · critic · product-    │
-│  owner · reviewer · tester · researcher          │
-│                                                 │
-│  Catalog agents (activated on demand):          │
-│  designer · security-reviewer                   │
-│                                                 │
-│  Hooks:                                         │
-│    PreToolUse: stage-gate · tool-guardrails     │
-│    PostToolUse: evidence-tracker · context-     │
-│                 pressure                        │
-│    Stop:         session-gate                   │
-│    SubagentStop: subagent-verdict-check         │
-└─────────────────────────────────────────────────┘
+### Group 1 — Manual overrides for stages the orchestrator drives
 
-Manual overrides: /strategize  /research  /vision-expand  /design-plan  /implementation-plan  /implement  /code-review  /strategic-review  /phase-complete  /merge-phase  /resume
-```
+You almost never run these. They exist so a human can drive a single stage manually if needed (debugging, recovery from interrupted run).
 
-## How Prompts & Agents Work
+| Prompt | Stage | Dispatches |
+|--------|-------|-----------|
+| `/strategize` | `strategy` | `strategist` |
+| `/design-plan` | `planning` | `planner` (planning mode) |
+| `/implementation-plan` | `implementation-planning` | `planner` (implementation mode) |
+| `/implement` | `executing` | `slice-runner` (one slice) |
+| `/code-review` | (per slice) | `reviewer` |
+| `/strategic-review` | `reviewing` | `product-owner` (review mode) |
+| `/phase-complete` | `cleanup` | `phase-completer` |
 
-- **Prompt files** (`.prompt.md`) — invoked via `/` commands in Chat. Task-specific, human-triggered.
-- **Custom agents** (`.agent.md`) — persistent personas with tool restrictions and handoffs. Selected in the agent picker.
-- **Instruction files** (`.instructions.md`) — applied automatically when Copilot works on matching files.
-- **Hooks** (`.github/hooks/`) — deterministic shell commands at agent lifecycle points (e.g., Stop hook blocks premature stopping).
-- **Skills** (`.github/skills/`) — technology-specific knowledge that Copilot auto-loads when relevant. Created by the autonomous builder for each stack technology.
-- **Workflow catalog** (`.github/catalog/`) — dormant agents, skills, hooks, and patterns that the builder activates when project characteristics match trigger conditions. See `MANIFEST.md` for the full index.
-- **AGENTS.md** — cross-agent instructions recognized by Copilot, Claude Code, and other AI agents.
-- Markdown links in prompt/agent bodies **auto-attach referenced files as context**.
-- Prompts link to `copilot-instructions.md` for shared project context.
+### Group 2 — Human-only entry points
+
+These are the prompts you actually type.
+
+| Prompt | When to type it |
+|--------|-----------------|
+| `/resume` | After any session that ended with `Stage: blocked`. Routes by `Blocked Kind`. |
+| `/merge-phase` | At the merge gate (`awaiting-merge-approval`). Prints the merge commands or PR URL; the human runs them. |
+| `/research <topic>` | You want a durable reference doc on something external. |
+| `/vision-expand` | The current vision is exhausted (`vision-exhausted` block). |
+| `/scrap-phase` | You want to abandon the current phase entirely. |
+| `/catalog-review` | You want to activate (or audit) catalog items. |
+
+### Group 3 — `/code-review` and `/research` are dual-purpose
+
+`/research` is also dispatched by strategist/critic when external grounding is needed. `/code-review` is also dispatched by slice-runner. You can also invoke them directly.
+
+## State writers (sanctioned helpers)
+
+Direct edits to `roadmap/state.md` are restricted by `tool-guardrails.py` (the threat model is forging `Stage: bootstrap` to unlock the enforcement-layer carve-out). Helpers exist for fields with cross-field invariants or validation logic:
+
+| Helper | Fields written | Why a helper |
+|---|---|---|
+| `write-stage.py` | `Stage`, `Blocked Kind`, `Blocked Reason`, `Next Prompt` | Bootstrap-forging gate + enforces `Stage=blocked ⇒ Blocked Kind` invariant |
+| `write-phase.py` | `Phase`, `Phase Title`, optional 17-field evidence reset | Phase boundary resets are too error-prone by hand |
+| `write-plan-evidence.py` | `Design/Implementation Plan`, `Design/Implementation Status`, `Slice Total` | Validates plan-file existence + status vocabulary |
+| `write-test-evidence.py` | `Tests Written`, `Tests Pass`, `Evidence For Slice` | Auto-binds `Evidence For Slice` to current `Active Slice` |
+| `write-commit-evidence.py` | `Committed` | Refuses to stamp `yes` if working tree is dirty |
+| `record-verdict.py` | Critique-verdict mutations: `Design/Implementation Status`, `Critique Rounds`, plus `Stage`/`Blocked Kind`/`Next Prompt`. Honors `Autopilot` for design-approve. | Enforces round budget + `^VERDICT:` trailer requirement |
+| `cut-branch.py` | (git only — no state.md write) | Centralises strategy/phase branch cuts; refuses dirty tree; idempotent |
+
+For everything else (`Active Slice`, `Reviewer Invoked`, `Review Verdict`, `Critical Findings`, `Major Findings`, `Strategic Review`, `Merge Mode`, `Autopilot`), edit the line directly via `replace_string_in_file`. The line-shape carve-out validates the edit is exactly one `- **Field**: value` change.
+
+## Hooks (lifecycle enforcement)
+
+| Hook | Event | What it does |
+|------|-------|--------------|
+| `stage-gate.py` | PreToolUse | Blocks edits outside `roadmap/`, `docs/`, `.github/` during non-executing stages. Fails closed on unknown Stage. |
+| `tool-guardrails.py` | PreToolUse | Denies destructive commands (force-push, rm -rf on critical paths, curl|sh, etc.) and writes to enforcement-layer paths. |
+| `branch-gate.py` | PreToolUse | Refuses `git commit` on `main`/`master`/`trunk`/`prod`. Bootstrap exempt. |
+| `tester-isolation.py` | PreToolUse (tester only) | Denies `semantic_search`/`codebase` entirely; path-gates reads to test+config patterns. |
+| `evidence-tracker.py` | PostToolUse | Logs tool-call summaries to `roadmap/sessions/<sessionId>.md`. Pure logger. |
+| `context-pressure.py` | PostToolUse | Advisory at high context usage. |
+| `subagent-verdict-check.py` | SubagentStop | Verifies critic/product-owner/reviewer/planner wrote their state fields and produced their artifact. |
+| `session-gate.py` | Stop | Refuses stop on incomplete Slice Evidence (during `executing`); refuses stop on `Stage: blocked` + `Blocked Kind: n/a`; surfaces `Next Prompt` on every stop. |
+
+## How prompts & agents work (mechanics)
+
+- **Prompt files** (`.prompt.md`) — invoked via `/` in Chat. Per the [VS Code docs](https://code.visualstudio.com/docs/copilot/customization/prompt-files): "you invoke prompt files manually in chat." They cannot be invoked from inside another agent's reasoning loop. The orchestrator drives stages by dispatching **subagents**, not by calling prompts.
+- **Custom agents** (`.agent.md`) — selected in the agent picker (or invoked as subagents by other agents). Have their own tool restrictions, hooks, handoffs.
+- **Subagents** — agent-callable workers with isolated context. Per the VS Code docs: "the main agent recognizes the part of the task that benefits from isolated context. The agent starts a subagent, passing only the relevant subtask. The subagent works autonomously and returns a summary." This is the primitive the orchestrator uses for every stage.
+- **Instruction files** (`.instructions.md`) — applied automatically when files match `applyTo` glob.
+- **Hooks** — deterministic shell commands at agent lifecycle points. JSON in/out per [hooks docs](https://code.visualstudio.com/docs/copilot/customization/hooks).
+- **Skills** (`.github/skills/`) — multi-file capabilities. Created by phase-completer for stack technologies.
+- **Workflow catalog** (`.github/catalog/`) — dormant capabilities activated at bootstrap. Index in `MANIFEST.md`.
+
+Markdown links in prompt/agent bodies auto-attach referenced files as context. Use that to keep agent files lean.
+
+## Branch hygiene — handled by `cut-branch.py`
+
+You don't manually run `git checkout -b` for workflow branches. The helper covers the four transitions:
+
+| Transition | Helper invocation | Where it's called |
+|---|---|---|
+| End of bootstrap | `cut-branch.py strategy` | BOOTSTRAP.md Step 6 |
+| Strategy approval (inline pick) | `cut-branch.py phase --number N --title "..."` | strategist subagent |
+| `/resume awaiting-strategy-approval` pick | same | resume prompt |
+| `/resume awaiting-merge-approval` (post-merge) | `cut-branch.py strategy --pull` | resume prompt |
+
+The helper refuses to run on a dirty tree, switches off any old `phase/*` branch to trunk before cutting (avoids carrying scrapped commits forward), and is idempotent (re-runs check out the existing branch).
 
 ## Troubleshooting
 
-- **Prompt doesn't appear in `/` menu?** — Check file is in `.github/prompts/` with `.prompt.md` extension.
-- **Agent can't find files?** — Don't add a `tools` field unless restricting. Default agent has full access.
-- **Stop hook not firing?** — Enable `chat.useCustomAgentHooks: true` in VS Code settings.
-- **Agent stops prematurely?** — The Stop hook should block this. Check that `session-gate.py` exists and is executable.
-- **Subagent returned without updating state?** — The `subagent-verdict-check.py` hook should block this. Check it is registered in the subagent's frontmatter and that `chat.useCustomAgentHooks: true`.
-- **Diagnostics** — Right-click in Chat view → Diagnostics to see all loaded prompts, agents, and errors.
+- **Slice-runner immediately fails** — check `chat.subagents.allowInvocationsFromSubagents` is `true`. Default is `false`; nesting is required for slice-runner to dispatch tester/reviewer.
+- **Branch-gate denies a commit** — you're on `main`/`master`/`trunk`/`prod`. The orchestrator should never have committed here outside bootstrap. Re-dispatch the subagent that should have cut the branch (strategist for phase, resume for strategy).
+- **Stop hook blocks session end** — read its message. Usually: incomplete Slice Evidence (finish the slice), or `Stage: blocked` + `Blocked Kind: n/a` (set the kind via `write-stage.py`).
+- **Prompt doesn't appear in `/` menu** — check it's in `.github/prompts/` with `.prompt.md` extension, and `Chat: Reload Window` if you just added it.
+- **Agent can't find files** — don't add a `tools` field unless restricting; default agent has full access.
+- **Subagent returned without updating state** — `subagent-verdict-check.py` should have blocked it; check `chat.useCustomAgentHooks: true`.
+- **Diagnostics**: Right-click in Chat view → Diagnostics to see all loaded prompts/agents/skills and any errors.

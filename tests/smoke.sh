@@ -60,6 +60,7 @@ required=(
   ".github/agents/critic.agent.md"
   ".github/agents/product-owner.agent.md"
   ".github/agents/researcher.agent.md"
+  ".github/agents/slice-runner.agent.md"
   ".github/prompts/design-plan.prompt.md"
   ".github/prompts/implementation-plan.prompt.md"
   ".github/prompts/implement.prompt.md"
@@ -133,6 +134,131 @@ if ! grep -q "researcher" "$TMP/.github/agents/autonomous-builder.agent.md"; the
 fi
 if ! grep -q "branch-gate.py" "$TMP/.github/agents/autonomous-builder.agent.md"; then
   echo "FAIL: branch-gate.py not in autonomous-builder hooks" >&2
+  exit 1
+fi
+
+echo "==> verifying autonomous-builder delegates the slice loop to slice-runner"
+if ! grep -q "slice-runner" "$TMP/.github/agents/autonomous-builder.agent.md"; then
+  echo "FAIL: slice-runner not registered in autonomous-builder agents list" >&2
+  exit 1
+fi
+# The orchestrator must NOT contain the inline 9-step slice loop anymore.
+# Allow the heading "delegated to" but block the 9-step inline form.
+if grep -qE "^1\. Invoke \*\*tester\*\* subagent" "$TMP/.github/agents/autonomous-builder.agent.md"; then
+  echo "FAIL: autonomous-builder still contains inline slice-loop step 1 (should delegate to slice-runner)" >&2
+  exit 1
+fi
+
+echo "==> slice-runner agent: contract present (tester, reviewer, runtime check, escalation)"
+for token in "user-invocable: false" "tester" "reviewer" "Runtime check" "write-stage.py blocked" "allowInvocationsFromSubagents"; do
+  if ! grep -q "$token" "$TMP/.github/agents/slice-runner.agent.md"; then
+    echo "FAIL: slice-runner.agent.md missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> implement.prompt: thin wrapper that dispatches slice-runner"
+if ! grep -q "slice-runner" "$TMP/.github/prompts/implement.prompt.md"; then
+  echo "FAIL: implement.prompt.md does not dispatch slice-runner" >&2
+  exit 1
+fi
+if grep -qE "^1\. \*\*Read the slice\*\*" "$TMP/.github/prompts/implement.prompt.md"; then
+  echo "FAIL: implement.prompt.md still contains inline slice-loop steps (should delegate to slice-runner)" >&2
+  exit 1
+fi
+
+echo "==> BOOTSTRAP: prompts for chat.subagents.allowInvocationsFromSubagents"
+if ! grep -q "allowInvocationsFromSubagents" "$TMP/BOOTSTRAP.md"; then
+  echo "FAIL: BOOTSTRAP.md does not mention chat.subagents.allowInvocationsFromSubagents" >&2
+  exit 1
+fi
+
+echo "==> BOOTSTRAP + resume: branch transitions go through cut-branch.py"
+for f in "$TMP/BOOTSTRAP.md" "$TMP/.github/prompts/resume.prompt.md"; do
+  if ! grep -q "cut-branch.py" "$f"; then
+    echo "FAIL: $f must invoke cut-branch.py for branch transitions" >&2
+    exit 1
+  fi
+done
+# Resume must NOT carry inline `git checkout -b` for workflow branches.
+if grep -qE "git checkout -b (phase/|strategy/)" "$TMP/.github/prompts/resume.prompt.md"; then
+  echo "FAIL: resume.prompt.md still has inline 'git checkout -b phase/...' or 'strategy/...' (should use cut-branch.py)" >&2
+  exit 1
+fi
+
+echo "==> cut-branch.py exists and supports strategy + phase subcommands"
+if [ ! -f "$TMP/.github/hooks/scripts/cut-branch.py" ]; then
+  echo "FAIL: cut-branch.py missing from generated output" >&2
+  exit 1
+fi
+for token in "def cut_strategy" "def cut_phase" "dirty"; do
+  if ! grep -q "$token" "$TMP/.github/hooks/scripts/cut-branch.py"; then
+    echo "FAIL: cut-branch.py missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> strategist agent: owns strategy stage end-to-end"
+if [ ! -f "$TMP/.github/agents/strategist.agent.md" ]; then
+  echo "FAIL: strategist.agent.md missing" >&2
+  exit 1
+fi
+for token in "user-invocable: false" "Autopilot" "cut-branch.py" "vscode_askQuestions" "strategy-YYYYMMDD" "at least 3 candidates"; do
+  if ! grep -q "$token" "$TMP/.github/agents/strategist.agent.md"; then
+    echo "FAIL: strategist.agent.md missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> phase-completer agent: owns cleanup stage end-to-end"
+if [ ! -f "$TMP/.github/agents/phase-completer.agent.md" ]; then
+  echo "FAIL: phase-completer.agent.md missing" >&2
+  exit 1
+fi
+for token in "user-invocable: false" "awaiting-merge-approval" "doc-sync" "wrap"; do
+  if ! grep -qi "$token" "$TMP/.github/agents/phase-completer.agent.md"; then
+    echo "FAIL: phase-completer.agent.md missing token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> orchestrator dispatches stage-owning subagents (not inline protocols)"
+ab="$TMP/.github/agents/autonomous-builder.agent.md"
+for token in "strategist" "slice-runner" "phase-completer" "product-owner" "critic" "Dispatch" "dispatch table"; do
+  if ! grep -qi "$token" "$ab"; then
+    echo "FAIL: autonomous-builder.agent.md missing dispatch token: $token" >&2
+    exit 1
+  fi
+done
+
+echo "==> stage-driving prompts are thin dispatch wrappers"
+for prompt in strategize design-plan implementation-plan strategic-review phase-complete implement; do
+  pf="$TMP/.github/prompts/${prompt}.prompt.md"
+  if [ ! -f "$pf" ]; then
+    echo "FAIL: prompt missing: $pf" >&2
+    exit 1
+  fi
+  # Cap at ~120 lines for thin wrappers; longer = inline protocol creep.
+  lines=$(wc -l < "$pf")
+  if [ "$lines" -gt 120 ]; then
+    echo "FAIL: $pf is $lines lines (>120) — should be a thin dispatch wrapper" >&2
+    exit 1
+  fi
+done
+
+echo "==> state.md ships with Autopilot field (default off)"
+if ! grep -qE "^- \*\*Autopilot\*\*: off$" "$TMP/roadmap/state.md"; then
+  echo "FAIL: state.md missing '- **Autopilot**: off' default line" >&2
+  exit 1
+fi
+
+echo "==> record-verdict.py honors Autopilot for design approve"
+if ! grep -q "is_autopilot" "$TMP/.github/hooks/scripts/record-verdict.py"; then
+  echo "FAIL: record-verdict.py does not consult is_autopilot" >&2
+  exit 1
+fi
+if ! grep -q "is_autopilot" "$TMP/.github/hooks/scripts/_state_io.py"; then
+  echo "FAIL: _state_io.py missing is_autopilot helper" >&2
   exit 1
 fi
 echo "==> researcher agent: no terminal access in frontmatter, public-source rules present"

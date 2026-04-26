@@ -9,8 +9,12 @@ autonomous-builder runs this script to:
        ``roadmap/phases/phase-{N}-critique-{design|implementation}-R{n}.md``.
     2. Parse a single ``^VERDICT: (approve|revise|rethink)$`` trailer line.
     3. Apply asymmetric state mutations:
-       * design + approve → Design Status=approved, Stage=blocked,
-         Blocked Kind=awaiting-design-approval, Next Prompt=/resume.
+       * design + approve under Autopilot:off → Design Status=approved,
+         Stage=blocked, Blocked Kind=awaiting-design-approval,
+         Next Prompt=/resume.
+       * design + approve under Autopilot:on → Design Status=approved,
+         Stage=implementation-planning, Blocked Kind=n/a,
+         Next Prompt=/implementation-plan (soft-gate bypass per ADR-013).
        * impl + approve → Implementation Status=approved, Stage=executing,
          Active Slice=1, Next Prompt=/implement.
        * {design,impl} + revise → status=revise, Next Prompt=
@@ -38,6 +42,7 @@ import sys
 from _state_io import (
     get_field,
     get_field_raw,
+    is_autopilot,
     state_exists,
     state_path,
     update_state_field,
@@ -178,15 +183,24 @@ def apply_design(cwd: str, verdict: str, round_no: int) -> None:
     if not update_state_field(cwd, "Design Critique Rounds", str(round_no)):
         die("Design Critique Rounds field not found in state.md.")
     if verdict == "approve":
-        update_state_field(cwd, "Stage", "blocked")
-        update_state_field(cwd, "Blocked Kind", "awaiting-design-approval")
-        update_state_field(
-            cwd,
-            "Blocked Reason",
-            "Design plan approved by critic; awaiting human approval before "
-            "implementation planning.",
-        )
-        update_state_field(cwd, "Next Prompt", "/resume")
+        if is_autopilot(cwd):
+            # Autopilot bypasses the design-approval session break.
+            # The human can still review retroactively via state.md +
+            # CURRENT-STATE.md Context; the merge gate remains unconditional.
+            update_state_field(cwd, "Stage", "implementation-planning")
+            update_state_field(cwd, "Blocked Kind", "n/a")
+            update_state_field(cwd, "Blocked Reason", "n/a")
+            update_state_field(cwd, "Next Prompt", "/implementation-plan")
+        else:
+            update_state_field(cwd, "Stage", "blocked")
+            update_state_field(cwd, "Blocked Kind", "awaiting-design-approval")
+            update_state_field(
+                cwd,
+                "Blocked Reason",
+                "Design plan approved by critic; awaiting human approval before "
+                "implementation planning.",
+            )
+            update_state_field(cwd, "Next Prompt", "/resume")
     else:
         # revise / rethink — stay in design-critique conceptually but route
         # the next prompt back to /design-plan so the planner re-runs.

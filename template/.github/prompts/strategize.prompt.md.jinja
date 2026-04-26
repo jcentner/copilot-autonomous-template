@@ -1,147 +1,40 @@
 ---
-description: "Pick the next phase. Reads vision + open questions + tech debt + recent context; presents ranked candidates; writes a strategy artifact; advances Stage to planning on approval."
+description: "Pick the next phase by dispatching the strategist subagent. Manual override entry point — the autonomous-builder normally drives this automatically when entering Stage: strategy."
+agent: autonomous-builder
 ---
 
-# Strategize — {{ project_name }}
+# Strategize
 
-Pick the next phase. The autonomous-builder calls this prompt when entering `Stage: strategy`; humans can also invoke it manually after `/scrap-phase` or to re-evaluate priorities.
+You are picking the next phase of {{ project_name }}. This prompt is a **manual override entry point** — the autonomous-builder normally dispatches `strategist` automatically when `Stage` is `strategy`.
 
 ## Precondition
 
-1. Read [`roadmap/state.md`](../../roadmap/state.md). `Stage` should be `strategy` (or `blocked` with `Blocked Kind: scrapped-by-human` / `awaiting-strategy-approval`). If not, refuse and report the current stage.
-2. Read [`docs/vision/VISION-LOCK.md`](../../docs/vision/VISION-LOCK.md).
+1. Read [`roadmap/state.md`](../../roadmap/state.md). `Stage` should be `strategy` (or `blocked` with `Blocked Kind: scrapped-by-human` / `awaiting-strategy-approval`). If not, stop and report the current stage.
 
-## Phase A — Ground the candidate list
+## What to do
 
-Read in this order; do **not** invent candidates from imagination:
+**Dispatch the `strategist` subagent.** It owns:
 
-1. [`docs/reference/open-questions.md`](../../docs/reference/open-questions.md) — unresolved decisions are candidate phases.
-2. [`docs/reference/tech-debt.md`](../../docs/reference/tech-debt.md) — debt-paydown candidates.
-3. [`docs/wraps/`](../../docs/wraps/) (last 3 entries) — what was deferred?
-4. [`roadmap/CURRENT-STATE.md`](../../roadmap/CURRENT-STATE.md) `## Context` (last 10 entries) — including any `[ISO8601] bootstrap: detected external systems — …` line written during bootstrap.
-5. [`docs/plans/`](../../docs/plans/) if it exists — pre-baked candidate plans.
-6. Any `## Proposed Workflow Improvements` / `## Proposed Vision Updates` entries in `CURRENT-STATE.md`.
+- Grounding the candidate list (vision, open questions, tech debt, wraps, recent context, plans, proposed updates).
+- Producing at least 3 candidates with effort/value/risk/vision alignment.
+- Branching on `Autopilot`: under `on`, picks top candidate and writes rationale; under `off`, presents via `vscode_askQuestions` with an escape option.
+- Cutting the phase branch via `cut-branch.py phase --number N --title "..."` on inline pick.
+- Stamping `Phase` / `Phase Title` (handles the `Phase == 0 → 1` bootstrap case).
+- Writing `roadmap/strategy-YYYYMMDD-HHMMSSZ.md` artifact.
+- Advancing to `planning` (inline pick) or `awaiting-strategy-approval` (escape).
 
-## Phase B — Rank candidates
+The full contract lives in [.github/agents/strategist.agent.md](../agents/strategist.agent.md). Do not re-implement these steps here — re-dispatch strategist if needed.
 
-Produce **at least 3 candidates**, including at least one that does not appear in `docs/plans/` (force divergence; default-to-planned biases toward sunk cost). For each candidate:
+## After strategist returns
 
-- **Title** — short imperative, e.g., "Wire OAuth provider abstraction".
-- **Effort** — XS / S / M / L / XL (rough).
-- **Value** — how much closer to the next vision milestone? (Cite the milestone.)
-- **Risk** — biggest unknown; what could derail this?
-- **Vision alignment** — quote the relevant Vision Lock goal/outcome.
-- **External grounding** — does this involve a system without a `docs/reference/<system>.md` doc or `.github/skills/<system>/SKILL.md`? If yes, surface `RECOMMENDED: /research <system>` before approval. If the bootstrap "detected external systems" line listed the system, this is mandatory.
-- **Catalog touch** — does this need a catalog item not yet activated? If yes, surface `RECOMMENDED: /catalog-review`. **In particular**: if the candidate is UI-shaped (web app / front-end / page-level work) and `designer` is not activated under `.github/agents/`, surface `RECOMMENDED: /catalog-review activate designer` — the slice loop's runtime check (step 5b) and the planner's Reality Check Layer B both depend on it for browser walkthroughs.
+Re-read `roadmap/state.md`:
 
-## Phase C — Present and decide
-
-Use `vscode_askQuestions` with options:
-
-- One option per candidate (label = title; description = effort/value/risk).
-- "**None of these — let me amend or add**" → loop back to Phase A with the human's input.
-- "**Save and let me think**" → write the artifact, set escape state (see below), and stop.
-
-Mark the planner-recommended top pick as `recommended: true` (your best guess); the human is free to choose anything.
-
-**Autopilot warning.** If autopilot is enabled, `vscode_askQuestions` will be auto-answered — the gate degrades to "pick whatever the planner ranked first." This silently defeats the strategy approval gate. Before presenting, surface a one-line note in the chat: *"Autopilot is on; the strategy gate is degraded. Disable autopilot to make this an actual human decision."* This is advisory only — there is no hook that detects autopilot state.
-
-## Phase D — Write artifact
-
-Write to `roadmap/strategy-YYYYMMDD-HHMMSSZ.md` (UTC, lex-sortable; the latest by sorted filename is canonical). Required sections:
-
-```markdown
-# Strategy — <ISO8601 timestamp>
-
-> Vision Lock: docs/vision/VISION-LOCK.md (version <X.Y.Z>)
-> Current Phase: <N> (<Phase Title>)
-
-## Context
-
-What was read (file paths) and what stood out.
-
-## Candidates considered
-
-For each: title, effort, value, risk, vision alignment, grounding gaps,
-catalog gaps, and a one-paragraph rationale.
-
-## Decision
-
-- **Picked**: <title> (or "ESCAPED: human chose to think")
-- **Rationale**: <2–4 sentences>
-- **Rejected because**: short note for each non-picked candidate
-- **Recommended follow-ups**:
-  - `/research <system>` if needed
-  - `/catalog-review` if needed
-  - any open questions to record
-
-## Next state
-
-- Stage → planning (on inline pick) | blocked + awaiting-strategy-approval (on escape)
-- Phase → <N or N+1 per the rules in autonomous-builder.agent.md>
-- Phase Title → <picked title>
-- Next Prompt → /design-plan (on pick) | /resume (on escape)
-```
-
-## Phase E — Update state
-
-### On inline pick
-
-Apply per the `Phase` value rules in [`autonomous-builder.agent.md`](../agents/autonomous-builder.agent.md):
-
-- If `Phase == 0` (post-bootstrap, never strategized before): pass `--number 1` to the helper below.
-- Else: omit `--number` so Phase is left alone (it was already incremented by `/resume` post-merge, or set by a prior scrap path).
-
-**Cut the phase branch before mutating state.** Compute a kebab-case slug of the picked title, then:
-
-```bash
-# If currently on a phase/* branch (e.g., post-/scrap-phase the agent is
-# still on the abandoned branch), check out main first — otherwise the new
-# phase branch is cut from the abandoned branch's tip and carries scrapped
-# commits into the next phase, which /merge-phase will then see in the merge
-# range. Determined dynamically:
-if git rev-parse --abbrev-ref HEAD | grep -qE '^phase/'; then
-  git checkout main
-fi
-# If currently on `strategy/*` (typical post-bootstrap path), branch off it.
-# If on `main` (e.g., after /resume post-merge cut a fresh strategy branch), same.
-git checkout -b phase/<N>-<kebab-title>
-```
-
-`branch-gate.py` denies commits on `main`/`master`/`trunk`/`prod` outside bootstrap; `/merge-phase` requires the current branch to match `^phase/N-` for the merge handshake. Cutting the branch here makes both happy.
-
-Then stamp the new phase identity and stage transition via the sanctioned helpers (do not edit `state.md` directly \u2014 `tool-guardrails.py` blocks it):
-
-```bash
-# First strategy approval after bootstrap (Phase == 0):
-python3 .github/hooks/scripts/write-phase.py --number 1 --title "<chosen title>"
-# Subsequent picks (Phase already incremented by post-merge resume):
-python3 .github/hooks/scripts/write-phase.py --title "<chosen title>"
-
-python3 .github/hooks/scripts/write-stage.py planning --next-prompt /design-plan
-```
-
-The `write-stage.py` helper auto-clears `Blocked Kind` / `Blocked Reason`.
-
-Append to `## Context` in `CURRENT-STATE.md`: `[ISO8601] strategize: phase N \u2014 <title>; <one-line rationale>; artifact: roadmap/strategy-\u2026md`.
-
-### On "save and let me think"
-
-```bash
-python3 .github/hooks/scripts/write-stage.py blocked \
-    --blocked-kind awaiting-strategy-approval \
-    --blocked-reason "Strategy artifact saved; human to review and resume." \
-    --next-prompt /resume
-```
-
-Do NOT touch `Phase` or `Phase Title`.
-
-Append to `## Context`: `[ISO8601] strategize: escaped to human; artifact: roadmap/strategy-…md`.
+- `Stage: planning`, `Next Prompt: /design-plan` → strategy succeeded; the orchestrator (or you, if continuing manually) now dispatches the planner.
+- `Stage: blocked`, `Blocked Kind: awaiting-strategy-approval` → human escape; stop. `/resume` re-presents candidates next session.
+- `Stage: blocked`, `Blocked Kind: error` → strategist failed. Read `Blocked Reason`, fix the cause, re-dispatch.
 
 ## Rules
 
-- **Do not invent user needs.** Cite the source document for every candidate.
-- **Do not overwrite previous strategy artifacts.** Each invocation writes a new timestamped file.
-- **Do not write to `roadmap/phases/`.** That's `planning`'s job (and `stage-gate.py` blocks it during `strategy`).
-- **Do not skip the artifact.** If the human picks a candidate, the artifact still gets written before the state flip — the rationale must be on disk for the next session.
-- **Stop after writing state.** No further work this session.
+- Do not invent candidates here — strategist grounds them in source documents.
+- Do not skip the artifact — strategist always writes one before advancing state.
+- Do not bypass `cut-branch.py` — manual `git checkout -b` skips the dirty-tree check that prevents carrying scrapped commits forward.

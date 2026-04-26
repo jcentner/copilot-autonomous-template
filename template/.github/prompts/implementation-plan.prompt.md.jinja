@@ -1,111 +1,39 @@
 ---
-description: "Produce a file-by-file implementation plan from an approved design plan."
+description: "Produce the implementation plan by dispatching the planner subagent. Manual override entry point — the autonomous-builder normally drives this automatically when entering Stage: implementation-planning."
 agent: planner
 ---
 
 # Implementation Plan
 
-You are converting an approved design into a slice-by-slice implementation plan for {{ project_name }}.
+You are converting an approved design into a slice-by-slice implementation plan for {{ project_name }}. This prompt is a **manual override entry point** — the autonomous-builder normally dispatches `planner` automatically when `Stage` is `implementation-planning`.
 
 ## Precondition (hard gate)
-
-Before producing anything:
 
 1. Read `roadmap/state.md`.
 2. Verify **Design Status** is `approved` or `waived`. If it is `draft`, `in-critique`, `revise`, or `rethink`, **stop** and report: "Design Status is `<value>` — design must be approved before implementation planning."
 3. Verify **Design Plan** field points to an existing file. If not, stop and report.
 
-Do not proceed past this gate. The critic's SubagentStop hook protects the design stage; this prompt protects the handoff.
+## What to do
 
-## Required reads
+**Dispatch the `planner` subagent in implementation-planning mode.** It owns:
 
-- The design plan referenced in state.md **Design Plan** — including its `## Existing Implementation` section (Block A Reality Check); your slice anchors must be consistent with what was found there.
-- [Architecture overview](../../docs/architecture/overview.md)
-- [Open questions](../../docs/reference/open-questions.md)
-- Relevant ADRs under `docs/architecture/decisions/`
+1. **Codebase verification** (`Codebase Anchors (verified)` per slice, mandatory before slice authoring): `grep_search` + `read_file` + `file_search` (not memory) to confirm every `Files touched` path and every named symbol the slice integrates with. Cite `path:line` for existing; cite negative search for new files.
+2. Writing `roadmap/phases/phase-N-implementation.md` with all required sections: Design Reference, Prerequisites, Slice Plan (each slice has Files touched + Codebase Anchors + Scope + Acceptance Criteria + Test Strategy + Dependencies + carries forward the design's `Kind`), Integration Steps, Post-Implementation Checks.
+3. Stamping state via `write-plan-evidence.py impl-plan <path>`, `... impl-status draft`, and `... slice-total <count>`.
 
-## Phase 0 — Codebase verification (MANDATORY before slice authoring)
+The full contract lives in [.github/agents/planner.agent.md](../agents/planner.agent.md) `### implementation-planning`. Do not re-implement here.
 
-The design plan's Reality Check tells you what *exists*. The implementation plan must additionally verify that every file path, function, class, route, table, or endpoint each slice intends to touch is **real and at the location claimed** — or, for new files, **confirmed not present**. Speculative paths are the most common cause of executing-stage rework.
+## After planner returns
 
-For each slice, before writing it, use `grep_search` + `read_file` + `file_search` (not memory) to confirm:
+Re-read `roadmap/state.md`:
 
-- Every existing file in `Files touched` is at the cited path. Cite the confirmation.
-- Every new file in `Files touched` is **not** already present. Cite the negative search.
-- Every named function / class / route / table / endpoint / config key the slice integrates with exists at a specific `path:line`. Cite it.
-- Renames or deletions performed by an earlier slice in this same plan are tracked — do not list a path that an earlier slice already moved.
-
-Record the results in each slice's `Codebase Anchors (verified)` subsection (see required structure below). The critic will pick at least one slice and re-run your searches; mismatches are Blocking.
-
-## Task
-
-Write `roadmap/phases/phase-N-implementation.md` where `N` matches state.md **Phase**.
-
-### Required structure
-
-```markdown
-# Implementation Plan: Phase N — <Title>
-
-## Design Reference
-Approved design: [phase-N-design.md](./phase-N-design.md) — as of state.md.
-
-## Prerequisites
-- [ ] All open questions marked `must resolve before implementation` are resolved.
-- [ ] Dependencies installed / available.
-
-## Slice Plan
-
-For each slice in the design's Slice Breakdown, expand:
-
-### Slice M — <name>
-
-- **Files touched**: list with path + verb (create/modify/delete).
-- **Codebase Anchors (verified)**: results of Phase 0 verification for this slice.
-  - Existing files: e.g. `src/components/Foo.tsx — confirmed exists (read_file, 142 lines)`.
-  - New files: e.g. `src/components/Bar.tsx — confirmed not present (file_search)`.
-  - Each named symbol / route / table / endpoint this slice integrates with: cite `path:line` (e.g. `getCommitteeBills() — src/lib/queries.ts:88`).
-  - Cross-reference to the design plan's `## Existing Implementation` finding(s) this slice relies on.
-  - If a Reality Check finding said "already shipped", the slice `Kind` must be `wire-up | augment | audit | drop` — never `build` over existing code. Carry the design's `Kind` forward.
-- **Scope**: one-paragraph summary of what lands in this slice.
-- **Acceptance criteria** (from design): copy the criterion(ia) this slice satisfies.
-- **Test strategy**: unit / integration / e2e / manual, with file paths for test locations.
-- **Dependencies**: other slices or external work that must precede this one.
-
-## Integration Steps
-Steps that span multiple slices (wiring, migrations, config rollout).
-
-## Post-Implementation Checks
-What the builder must verify before invoking the reviewer.
-- [ ] Stale references grep (search for old names/paths removed).
-- [ ] Config traces: every configurable value referenced end-to-end.
-- [ ] Diagram/prose consistency: architecture docs match what was built.
-- [ ] All unit + integration tests pass.
-- [ ] Acceptance criteria from the design plan verified.
-```
-
-## After writing
-
-Direct edits to `roadmap/state.md` are blocked by `tool-guardrails.py`. Stamp the planning fields via the sanctioned helper:
-
-```bash
-python3 .github/hooks/scripts/write-plan-evidence.py impl-plan roadmap/phases/phase-N-implementation.md
-python3 .github/hooks/scripts/write-plan-evidence.py impl-status draft
-python3 .github/hooks/scripts/write-plan-evidence.py slice-total <number-of-slices>
-```
-
-All three are required. `Slice Total` ships as `n/a` and the reviewer agent reads it on every invocation, so omitting it will block review.
-
-## Handoff
-
-Hand off to **critic** for adversarial review (max 2 rounds). On approve, the builder will set Stage to `executing`.
-
-> **If you are the planner subagent dispatched by `autonomous-builder`, skip this section.** Nested subagent invocation is disabled by default and the builder owns the `implementation-planning → implementation-critique` transition. It will dispatch critic itself once it sees `Implementation Status: draft`. Act on the Handoff section only when a human invoked you directly via `/implementation-plan`.
+- `Implementation Plan: <path>`, `Implementation Status: draft`, `Slice Total: <N>` → planner succeeded. The orchestrator advances to `implementation-critique` and dispatches `critic`. On critic `approve`, `record-verdict.py impl R<n>` advances to `executing`, sets `Active Slice: 1`, `Next Prompt: /implement`.
+- Otherwise: planner didn't satisfy its return contract. Re-dispatch with a note about what's missing.
 
 ## Rules
 
-- **Anchors first.** Every `Files touched` path and every named symbol the slice integrates with must be verified before authoring the slice. Speculative paths are the most common cause of executing-stage rework, and the critic will spot-check.
+- Anchors first. Speculative paths are the most common cause of executing-stage rework.
 - Do not write code. This is a planning artifact.
-- Be specific: vague plans cause slice loops to stall.
 - Order slices by dependency; leaves first.
 - Every acceptance criterion in the design must map to at least one slice.
-- Carry forward the `Kind` from the design plan; never silently upgrade `wire-up` / `augment` to `build`.
+- Carry forward the design's `Kind` per slice; never silently upgrade `wire-up` / `augment` to `build`.

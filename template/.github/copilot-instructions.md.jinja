@@ -31,6 +31,7 @@ You are working on **{{ project_name }}**, {{ description }}.
 - `Strategic Review` terminal values: `pass`, `replan`, `n/a`.
 - `Next Prompt` — the slash-command the human / orchestrator should run next. Written by every Stage transition. Surfaced by the Stop hook on every session end.
 - `Merge Mode` — `cli` (local merge by human) or `pr` (push + open PR). Picked at bootstrap; edit in `state.md` to change.
+- `Autopilot` ∈ `on`, `off`. Workflow-level switch (separate from VS Code's per-tool `chat.autopilot.enabled`). Under `on`, the strategist subagent picks the top-ranked candidate without asking, and `record-verdict.py design <round> approve` advances directly to `implementation-planning` instead of blocking on `awaiting-design-approval`. The merge gate is **not** affected — it always pauses.
 
 Writing a non-terminal value into a terminal field (e.g., `Review Verdict: pending`) will be caught by the SubagentStop hook.
 
@@ -60,10 +61,27 @@ Code style, commit message format, choice of subagent vs. inline work, error-rec
 
 ## Execution modes
 
-- **Autonomous builder** — use the `autonomous-builder` agent for **major feature work** that should go through the full strategy → design → implement → review → merge pipeline.
+- **Autonomous builder** — use the `autonomous-builder` agent for **major feature work** that should go through the full strategy → design → implement → review → merge pipeline. The orchestrator dispatches stage-owning subagents (strategist, planner, critic, product-owner, slice-runner, phase-completer) and loops on `Stage` transitions. It does not re-implement stage protocols inline.
 - **Plain Agent mode (no agent picker)** — use for **typos / docs-only edits / one-line bug fixes / hot-fixes**. The autonomous builder's strategy + critique rounds are overhead you don't need for trivial changes. This split is doc-only — no hook enforces it.
-- **Autopilot**: the builder self-approves implementation plan advancement and logs rationale to the per-session log. **Three** hard human gates: **strategy approval** (when escaped to session-break), **design plan approval** (always), and **merge approval** (always). All three force a session break via `Stage: blocked` + a specific `Blocked Kind`. Recommended autopilot setting: OFF during `strategy` and at merge gates; ON acceptable during `design-critique` through `executing`.
-- **Manual**: the builder uses `vscode_askQuestions` at checkpoints (strategy approval, design approval, implementation plan approval, phase review, merge). Hooks still apply.
+
+### Two layers of autopilot (independent switches)
+
+| Switch | Lives in | Controls |
+|--------|----------|----------|
+| `chat.autopilot.enabled` | VS Code settings | Whether tool calls auto-confirm (per-call human click). |
+| `Autopilot` field | `roadmap/state.md` | Whether the orchestrator pauses at the **soft** human gates (strategy candidate pick, design-plan approval). |
+
+The **merge gate** is unconditional — autopilot cannot do the human's `git push` / `gh pr create`. Escalation blocks (`awaiting-vision-update`, `awaiting-human-decision`, `error`, `vision-exhausted`) also always pause.
+
+| Mode you want | Copilot autopilot | Workflow Autopilot |
+|---|---|---|
+| Heads-down session, trust the loop | ON | `on` |
+| Heads-down execution, but I want to review the design before code | ON | `off` |
+| Reviewing each tool call, learning the system | OFF | `off` |
+
+Flip workflow Autopilot by editing `roadmap/state.md` directly: `- **Autopilot**: off` → `on`. The line-shape carve-out in `tool-guardrails.py` allows it; no helper required.
+
+The only bootstrap-time override: greenfield bootstrap must interview the human. That is the sole stage where "don't ask clarifying questions" is waived.
 
 The only bootstrap-time override: greenfield bootstrap must interview the human. That is the sole stage where "don't ask clarifying questions" is waived.
 

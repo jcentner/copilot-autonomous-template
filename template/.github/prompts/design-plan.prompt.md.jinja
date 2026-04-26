@@ -1,145 +1,42 @@
 ---
-description: "Produce a design plan for the next phase: user stories, acceptance criteria, non-goals, risks, ADR candidates, test strategy, slice breakdown."
+description: "Produce the design plan by dispatching the planner subagent. Manual override entry point — the autonomous-builder normally drives this automatically when entering Stage: planning."
 agent: planner
 ---
 
 # Design Plan
 
-You are drafting the design plan for the next phase of {{ project_name }}. The autonomous builder normally runs this, but you can invoke it manually from any stage.
+You are drafting the design plan for the current phase of {{ project_name }}. This prompt is a **manual override entry point** — the autonomous-builder normally dispatches `planner` automatically when `Stage` is `planning`.
 
-## Required reads
+## Precondition
 
-- [Workflow state](../../roadmap/state.md) — parse `Phase`, `Stage`, open slice evidence
-- [Vision lock](../../docs/vision/VISION-LOCK.md) — authoritative scope
-- [Roadmap](../../roadmap/README.md)
-- [Open questions](../../docs/reference/open-questions.md) — flag blockers
-- [ADR index](../../docs/architecture/decisions/README.md)
+1. Read `roadmap/state.md`. `Stage` should be `planning` (or `design-critique` if revising after a critic round).
+2. Note `Phase` and `Phase Title`.
 
 ## Input
 
-Phase description: **${input:phaseDescription}**
+Optional phase description (if amending the strategist's pick): **${input:phaseDescription}**
 
-## Phase 0 — Reality check (MANDATORY before drafting slices)
+## What to do
 
-Most bad design plans propose `build` slices for things that are already (partially) shipped. You **must** ground the plan in what already exists before writing the slice list. Do not skip this step.
+**Dispatch the `planner` subagent in planning mode.** It owns:
 
-For each capability the phase intends to deliver, gather evidence in **two** layers and record it in the `## Existing Implementation` section of the plan (see required structure below).
+1. **Reality Check** (`## Existing Implementation` section, mandatory before slice authoring):
+   - **Layer A — Codebase**: `grep_search` + `read_file` (not memory) to find existing code touching the phase's surface; cite `path:line` or explicit "no existing code found (searched: …)".
+   - **Layer B — Deployed/runnable surface**: when one exists, observe it. Web/UI: dispatch `designer` (catalog) for browser walkthrough. API/CLI: probe directly. If `designer` is not activated and the phase is UI-shaped, escalate `RECOMMEND: /catalog-review activate designer` rather than writing a hand-waved `Layer B: n/a`.
+2. Writing `roadmap/phases/phase-N-design.md` with all required sections: Status, Goal, Existing Implementation, User Stories (placeholder), Acceptance Criteria, Non-Goals, Risks, ADR Candidates, Test Strategy, Slice Breakdown (each slice declares `Kind: build | wire-up | augment | audit | drop` consistent with the Reality Check).
+3. Stamping state via `write-plan-evidence.py design-plan <path>` and `write-plan-evidence.py design-status draft`.
 
-### Layer A — Codebase inventory (always required)
+The full contract lives in [.github/agents/planner.agent.md](../agents/planner.agent.md). Do not re-implement here.
 
-Use [`grep_search`](../../README.md) (and `read_file` on the matches) — not memory — to inventory existing code that touches the phase's surface. For each capability, capture either:
+## After planner returns
 
-- One or more `path/to/file.ts:LINE` references showing the shipped behavior, **or**
-- An explicit "no existing code found for `<capability>` (searched: `<patterns>`)" line. Negative evidence is still evidence; an unchecked capability is not.
+Re-read `roadmap/state.md`:
 
-If you discover code that already partially implements a slice, you must say so explicitly and reframe the slice to `wire-up`, `augment`, `audit`, or `drop` (see Slice Kind below) — never silently propose `build` over existing code.
-
-### Layer B — Deployed/runnable surface (when applicable)
-
-If the project has a running surface and you have access to inspect it (browser tools, a local dev server you can curl, a deployed URL), **inspect it before drafting slices**. The whole point of a design plan is to be grounded in observable reality, not speculation.
-
-- **Web/UI projects**: navigate the relevant pages with browser tools (or have the autonomous-builder do so via Explore). Note which UI elements, sections, CTAs, placeholder states, etc. are already rendered. Capture screenshots or DOM excerpts when material.
-- **API/CLI projects**: probe the relevant endpoints/commands. Record the actual response shape and observed behavior.
-- **No deployed/runnable surface available**: write `Layer B: n/a — <one-line reason>` (e.g., "pre-deploy phase, no runnable surface yet"). Do not fabricate.
-
-If you do not have the tools to inspect Layer B yourself but the project clearly has a runnable surface, **return to the autonomous-builder with the inspection request** — the builder dispatches the catalog `designer` agent (browser walkthroughs) or runs API/CLI probes itself, then re-dispatches you with the findings appended to the plan. Do not write `Layer B: n/a` because you personally lack browser tools; that is the failure mode this step exists to prevent. If `designer` is not activated under `.github/agents/`, the builder must surface `/catalog-review activate designer` to the human first.
-
-The [evidence-gathering skill](../../skills/evidence-gathering/SKILL.md) covers the audit patterns (curl/jq, schema dumps, file inventory).
-
-## Task
-
-Write `roadmap/phases/phase-N-design.md` (where `N` = next phase from CURRENT-STATE). The file **must** contain every section below, in this order.
-
-### Required structure
-
-```markdown
-# Phase N: <Title>
-
-## Status
-draft | in-critique | approved | waived
-
-## Goal
-One paragraph: what this phase delivers and why.
-
-## Existing Implementation (Reality Check)
-_Required. Output of Phase 0 above. Do not skip; the critic will treat a missing or hand-waved Reality Check as a Blocking finding._
-
-**Layer A — Codebase inventory**
-- **`<capability 1>`**: <file:line evidence | "no existing code found (searched: `<patterns>`)">
-- **`<capability 2>`**: ...
-
-**Layer B — Deployed/runnable surface**
-- **`<surface 1>`**: <observation, with screenshot/excerpt where material | "n/a — <reason>">
-- **`<surface 2>`**: ...
-
-**Implications for slices**: short paragraph mapping what's already shipped to which slices below are `build` vs `wire-up` vs `augment` vs `audit` vs `drop`.
-
-## User Stories
-_(populated by product-owner handoff; leave as `(to be populated by product-owner)` if not yet invoked)_
-
-- **As a** <user> **I want to** <capability> **so that** <outcome>.
-
-## Acceptance Criteria
-Measurable outcomes per story.
-- [ ] Criterion 1 (observable, verifiable)
-- [ ] Criterion 2
-
-## Non-Goals
-Explicit exclusions to prevent scope creep.
-- Not doing X because Y.
-
-## Risks
-- **Risk**: description — **Mitigation**: approach.
-
-## ADR Candidates
-Decisions in this phase that warrant capture in `docs/architecture/decisions/`.
-- ADR-NNN (proposed): <decision title> — captures choice between A vs B.
-
-## Test Strategy
-Map each acceptance criterion to a test layer.
-- Unit: ...
-- Integration: ...
-- End-to-end: ...
-- Manual: ...
-
-## Slice Breakdown
-Ordered, independently-shippable slices with file-level hints. Each slice **must** declare a `Kind` and reference the Existing Implementation finding(s) it relies on.
-
-`Kind` vocabulary:
-- **build** — net-new code/UI; Layer A + B confirmed nothing exists.
-- **wire-up** — DOM/scaffolding/data exists but is unwired or stubbed (e.g. "Coming soon" placeholder); slice connects it.
-- **augment** — feature partially shipped; slice extends it (e.g. add per-row link to existing list).
-- **audit** — feature appears shipped; slice verifies consistency/accessibility/edge cases without new build.
-- **drop** — slice was originally proposed but Reality Check revealed it is already shipped; record why so the next round doesn't re-add it.
-
-1. **Slice 1 — <name>** (Kind: <build|wire-up|augment|audit|drop>): files touched, scope, tests to write. Grounded in Existing Implementation: <bullet ref or "no prior code">.
-2. **Slice 2 — <name>** (Kind: ...): ...
-```
-
-## After writing
-
-Direct edits to `roadmap/state.md` are blocked by `tool-guardrails.py`. Stamp the planning fields via the sanctioned helper:
-
-```bash
-python3 .github/hooks/scripts/write-plan-evidence.py design-plan roadmap/phases/phase-N-design.md
-python3 .github/hooks/scripts/write-plan-evidence.py design-status draft
-```
-
-The helper validates that the plan file exists and that the status value is in the canonical vocabulary (`draft | in-critique | approved | revise | rethink | waived`).
-
-## Handoff
-
-When the draft is complete, hand off to:
-
-- **product-owner** — to populate the User Stories section.
-- **critic** — for adversarial review (only after product-owner if applicable).
-
-> **If you are the planner subagent dispatched by `autonomous-builder`, skip this section.** Nested subagent invocation is disabled by default (`chat.subagents.allowInvocationsFromSubagents`), and the builder owns the `planning → design-critique` transition explicitly. The builder will dispatch product-owner and critic itself once it sees `Design Status: draft`. Act on the Handoff section only when a human invoked you directly via `/design-plan`.
+- `Design Plan: <path>`, `Design Status: draft` → planner succeeded. The orchestrator advances to `design-critique` via `write-stage.py design-critique` and dispatches `product-owner` (user stories) then `critic` (adversarial review).
+- Otherwise: planner didn't satisfy its return contract. Re-dispatch with a note about what's missing.
 
 ## Rules
 
-- **Reality first.** Phase 0 is mandatory — slice authoring without a populated `## Existing Implementation` section is a Blocking critic finding, not a stylistic preference. Half-shipped functionality is the most common (and most expensive) design failure mode.
-- Do **not** make implementation decisions here — that's `/implementation-plan`.
-- Flag unresolved blockers in `docs/reference/open-questions.md`; do not paper over them.
-- Do not edit source code. Your scope is plan files + `state.md`.
-- Respect authority order: VISION-LOCK > ADRs > architecture > roadmap. If this phase would contradict a higher doc, raise it instead of silently working around it.
+- Reality first. A `build` slice over already-shipped code is the failure mode this rule exists to prevent.
+- Do not make implementation decisions here — that's `/implementation-plan`.
+- Do not edit source code. Planner's `edit` is for plan files + state.md only.

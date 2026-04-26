@@ -33,7 +33,11 @@ candidate list is in the most recent `roadmap/strategy-*.md` artifact.
    re-run `/strategize` instead of re-presenting.
 3. Otherwise re-present the candidates via `vscode_askQuestions`.
 4. On a pick (any of the listed candidates):
-   - **Cut the phase branch before mutating state:** `git checkout -b phase/<N>-<kebab-title>` (off `strategy/*` or `main`, whichever the agent is on). Required for `branch-gate.py` and `/merge-phase`'s branch-name precondition.
+   - **Cut the phase branch before mutating state:**
+     ```bash
+     python3 .github/hooks/scripts/cut-branch.py phase --number <N> --title "<chosen title>"
+     ```
+     The helper refuses on a dirty tree, switches off any old `phase/*` checkout to trunk first, and is idempotent. Required for `branch-gate.py` and `/merge-phase`'s branch-name precondition.
    - Stamp Phase identity (handles the `Phase == 0 → 1` bootstrap case via `--number 1`; otherwise omit `--number` to leave it alone):
      ```bash
      # First strategy approval after bootstrap:
@@ -73,13 +77,11 @@ the merge landed, then advances Phase.
    ```bash
    python3 .github/hooks/scripts/write-stage.py strategy --next-prompt /strategize
    ```
-6. **Cut a fresh strategy branch off updated `main`** so the next session's first commit (the strategize artifact) doesn't fight `branch-gate.py`:
+6. **Cut a fresh strategy branch off updated `main`** so the next session's first commit (the strategist artifact) doesn't fight `branch-gate.py`:
    ```bash
-   git checkout main
-   git pull --ff-only
-   git checkout -b strategy/$(date -u +%Y%m%d)
+   python3 .github/hooks/scripts/cut-branch.py strategy --pull
    ```
-   Then commit the state.md changes from step 5 on this branch.
+   The helper switches to trunk, runs `git pull --ff-only` (best-effort, skipped if no `origin`), and cuts `strategy/YYYYMMDD`. Then commit the state.md changes from step 5 on this branch.
 7. Append to `## Context`: `[ISO8601] resume: phase N merge confirmed; advancing to strategy for phase N+1`.
 
 ### `scrapped-by-human`

@@ -1,88 +1,43 @@
 ---
-description: "Run the cleanup checklist: verify criteria, record ADRs, sync docs, write wrap summary, advance to next phase."
+description: "Run the cleanup checklist by dispatching the phase-completer subagent. Manual override entry point — the autonomous-builder normally drives this automatically when entering Stage: cleanup."
+agent: autonomous-builder
 ---
 
 # Phase Complete
 
-You are completing the current phase of {{ project_name }}. This prompt drives the `cleanup` stage of the state machine.
+You are completing the current phase of {{ project_name }}. This prompt is a **manual override entry point** — the autonomous-builder normally dispatches `phase-completer` automatically when `Stage` is `cleanup`.
 
 ## Precondition
 
-- Read `roadmap/state.md` and `roadmap/CURRENT-STATE.md`.
-- **Stage** should be `cleanup` (or `reviewing` if strategic review already passed). If earlier, stop and report.
+1. Read `roadmap/state.md`.
+2. **Stage** should be `cleanup` (or `reviewing` if catching up late). If earlier, stop and report.
 
-## Required reads
+## What to do
 
-- Design plan + implementation plan referenced in state.md.
-- All slice review files (`roadmap/phases/phase-N-review-slice-*.md`).
-- Strategic review (`roadmap/phases/phase-N-strategic-review.md`).
+**Dispatch the `phase-completer` subagent.** It owns:
 
-## Cleanup checklist — execute in order
+1. Verifying acceptance criteria against the design plan.
+2. Recording ADRs for new decisions.
+3. Updating open questions / tech debt / glossary.
+4. Syncing docs (README, architecture, instructions); clearing all `doc-sync: missing` rows from slice review files.
+5. Writing `docs/wraps/phase-N-wrap.md` from `docs/wraps/TEMPLATE.md`.
+6. Saving repo-memory notes.
+7. Vision lock check (within-scope updates inline; goal/scope drift escalates to `awaiting-vision-update`).
+8. Completing every `## Phase Completion Checklist` item in state.md.
+9. Handing off to the merge gate via `write-stage.py blocked --blocked-kind awaiting-merge-approval --next-prompt /merge-phase`.
 
-### 1. Verify acceptance criteria against the design plan
-- Walk each criterion. Confirm evidence (commit, test, demo).
-- Document any waived criterion in `CURRENT-STATE.md` `## Waivers`.
+The full contract lives in [.github/agents/phase-completer.agent.md](../agents/phase-completer.agent.md). Do not re-implement these steps here.
 
-### 2. Record ADRs
-- For each architectural decision made during this phase, create an ADR under `docs/architecture/decisions/`.
-- Update the ADR index.
+## After phase-completer returns
 
-### 3. Update open questions + tech debt + glossary
-- Close answered questions in `docs/reference/open-questions.md`; add new ones discovered.
-- Record shortcuts/compromises in `docs/reference/tech-debt.md`.
-- Add new terms to `docs/reference/glossary.md`.
+Re-read `roadmap/state.md`:
 
-### 4. Sync docs
-- Ensure README, architecture overview, and instructions reflect the codebase as shipped.
-- Grep for stale references to removed/renamed symbols.
-
-### 5. Write wrap summary
-- Create `docs/wraps/phase-N-wrap.md` using `docs/wraps/TEMPLATE.md` as the scaffold.
-- Required fields: design plan link, implementation plan link, slices completed (N/M), key decisions (link ADRs), what went well, what surprised us, deferred items.
-- Keep it tight: a future contributor should be able to reconstruct the phase's reasoning in 5 minutes.
-
-### 6. Save context notes to memory
-- Write or update `/memories/repo/` with patterns, gotchas, failures, and approaches worth carrying into the next phase.
-
-### 7. Vision lock updates
-- If learnings adjusted within-scope constraints or priorities, update `docs/vision/VISION-LOCK.md` in place, bump minor version, append changelog entry.
-- If goals/scope changed, **do not** edit the vision lock. Propose updates in `CURRENT-STATE.md` under `## Proposed Vision Updates`, then in `state.md` set **Stage** to `blocked`, **Blocked Kind** to `awaiting-vision-update`, and **Blocked Reason** to `"Vision update needs human review."`.
-
-### 8. Complete the Phase Completion Checklist in state.md
-- Check every box in the `## Phase Completion Checklist` section of `roadmap/state.md`.
-- The session-gate hook blocks session end during `cleanup` until every box is checked.
-
-### 9. Hand off to the merge gate
-
-**Do NOT increment `Phase`. Do NOT reset Slice Evidence, Design/Implementation fields, or critique-rounds counters here.** All Phase-scoped resets happen in `/resume` *after* the merge has landed on `origin/main` — running them now would (a) silently bypass the merge approval gate and (b) wipe the very Slice Evidence and `doc-sync: missing` rows that `/merge-phase` scans before approving the merge.
-
-The only state mutations this step performs (one atomic call):
-
-```bash
-python3 .github/hooks/scripts/write-stage.py blocked \
-    --blocked-kind awaiting-merge-approval \
-    --blocked-reason "Phase N cleanup complete; awaiting /merge-phase." \
-    --next-prompt /merge-phase
-```
-
-Do not edit `state.md` directly — `tool-guardrails.py` blocks it. The helper enforces the (Stage, Blocked Kind, Next Prompt) invariant in one write.
-
-The next session runs `/merge-phase`, which prepares the merge commands (or PR URL) per `Merge Mode`, then sits at `awaiting-merge-approval` until the human merges. `/resume` post-merge is the writer that increments `Phase`, resets Slice Evidence and Design/Implementation fields, and sets `Stage: strategy` for the next cycle.
-
-**Vision-update branch:** if Step 7 set `Stage: blocked` / `Blocked Kind: awaiting-vision-update`, leave that block in place — vision update intentionally skips the merge gate (the phase ships separately after the vision is updated).
-
-## Output
-
-After the merge-gate handoff, summarize:
-- Phase N status: cleanup complete; awaiting merge approval.
-- ADRs created (list).
-- Open questions resolved / added.
-- Tech debt recorded.
-- Wrap summary path.
-- Next slash-command for the human: `/merge-phase`.
+- `Stage: blocked`, `Blocked Kind: awaiting-merge-approval`, `Next Prompt: /merge-phase` → cleanup succeeded; human runs `/merge-phase` next.
+- `Stage: blocked`, `Blocked Kind: awaiting-vision-update`, `Next Prompt: /vision-expand` → vision drift detected; human handles vision update before merge.
+- Otherwise: phase-completer didn't satisfy its return contract. Re-dispatch with a note about what's missing; the `session-gate.py` Stop hook will block stop until cleanup is complete.
 
 ## Rules
 
-- Do not skip steps. The checklist is the gate.
-- Do not edit the vision lock for goal/scope changes — propose in `CURRENT-STATE.md`.
-- Do not mark a criterion as met without evidence.
+- Do not skip cleanup steps — the checklist is the gate.
+- The merge gate is **always** a session break, regardless of `Autopilot` — autopilot cannot run the human's merge command.
+- Do not increment `Phase` or reset Phase-scoped fields here — that's `/resume`'s job post-merge.

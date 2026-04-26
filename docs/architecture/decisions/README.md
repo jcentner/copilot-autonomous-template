@@ -23,6 +23,8 @@ the v1 redesign (April 2026).
 | [009](009-bootstrap-carve-out-and-protected-state.md) | Bootstrap carve-out and `state.md` write-protection | Accepted |
 | [010](010-three-tier-enforcement-honesty.md) | Three-tier enforcement vocabulary (deterministic / strongly-guided / advisory) | Accepted |
 | [011](011-strategy-stage-and-three-gate-approval.md) | Strategy stage + three hook-enforced human-approval gates; researcher promoted to core; `record-verdict.py` as sole writer of critique-rounds | Accepted |
+| [012](012-slice-loop-as-subagent.md) | Slice loop owned by `slice-runner` subagent (not the orchestrator) | Accepted |
+| [013](013-stages-as-subagents-and-autopilot-bypass.md) | Every Stage owned by exactly one subagent; orchestrator is a dispatch table; `Autopilot` field bypasses soft gates; `cut-branch.py` centralises branch transitions | Accepted |
 
 ## Conventions
 

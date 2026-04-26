@@ -79,6 +79,12 @@ VALID_NEXT_PROMPTS = {
 # Allowed values for the `Merge Mode` machine field. Picked at bootstrap.
 VALID_MERGE_MODES = {"cli", "pr", "n/a"}
 
+# Allowed values for the `Autopilot` machine field. Controls whether the
+# orchestrator pauses at soft human gates (strategy candidate pick, design
+# approval). The merge gate is unconditional — autopilot cannot do the
+# human's git push.
+VALID_AUTOPILOT = {"on", "off"}
+
 _FIELD_RE = re.compile(r"^\s*-\s+\*\*([^*]+)\*\*:\s*(.*?)\s*$")
 _UNCHECKED_RE = re.compile(r"^\s*-\s+\[ \]\s+(.*?)\s*$")
 
@@ -153,6 +159,15 @@ def get_field_raw(cwd: str, name: str, default: str = "") -> str:
     """Return a single state.md field value preserving original case."""
     fields, _ = parse_state(cwd)
     return fields.get(name.strip().lower(), default).strip()
+
+
+def is_autopilot(cwd: str) -> bool:
+    """True iff state.md `Autopilot` field is exactly `on` (case-insensitive).
+
+    Anything else (missing field, `off`, junk) is treated as off — fail
+    closed for the gate-bypass behavior.
+    """
+    return get_field(cwd, "Autopilot", "off") == "on"
 
 
 def atomic_write(path: str, content: str) -> None:
