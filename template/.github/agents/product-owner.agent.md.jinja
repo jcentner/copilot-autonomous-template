@@ -95,7 +95,9 @@ The justification must be at least 20 characters. The hook accepts this as termi
 
 ### What you produce
 
-Walk each acceptance criterion in the design plan and test whether the implementation satisfies it. When browser tools are available and a dev server is running, you may screenshot and navigate — otherwise reason from code + tests.
+Walk each acceptance criterion in the design plan and test whether the implementation satisfies it. When the implementation has a runnable user-facing surface (web UI, CLI, API), you **must** observe it — not just reason from code + tests. Browser tools are virtualized away from the autonomous-builder; if you need a browser walkthrough, dispatch the catalog `designer` agent (or invoke `/design-review`). For API/CLI, run the relevant probes via the autonomous-builder and have it feed results back. **If `designer` is not activated** under `.github/agents/`, the builder must surface `/catalog-review activate designer` to the human before you can complete a UI strategic review — do not write `Runtime observation: n/a` to paper over an inactive catalog item. Honest `Runtime observation: n/a — <reason ≥20 chars>` is acceptable only when there is genuinely no runnable surface (e.g., infrastructure-only phase) — not because the tools were inconvenient.
+
+If a criterion is marked `Met: Yes` based purely on code reading without observation of the running surface for a UI/API/CLI phase, mark it `Partial` with `evidence: code-only` until the runtime observation is recorded.
 
 Write `roadmap/phases/phase-N-strategic-review.md` (N = current Phase) containing:
 
@@ -135,3 +137,4 @@ Do not defer this to "the builder" — `session-gate` only blocks stop on `Strat
 - Be specific. "The user can manage their data" is useless; "the user can export projects as JSON from settings" is testable.
 - Do not modify source code. Your `edit` tool should only touch plan files, `state.md`, and `CURRENT-STATE.md` narrative.
 - Never silently downgrade acceptance criteria to match what shipped. If something didn't ship, say so and mark severity.
+- **Observe before judging.** A `pass` verdict on UI/API/CLI work without ever loading the page or hitting the endpoint is the strategic-review version of the design-time speculation bug. Honest `Runtime observation: n/a` with a reason is acceptable; silent code-only judgment is not.

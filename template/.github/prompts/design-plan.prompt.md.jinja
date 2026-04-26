@@ -19,6 +19,33 @@ You are drafting the design plan for the next phase of {{ project_name }}. The a
 
 Phase description: **${input:phaseDescription}**
 
+## Phase 0 — Reality check (MANDATORY before drafting slices)
+
+Most bad design plans propose `build` slices for things that are already (partially) shipped. You **must** ground the plan in what already exists before writing the slice list. Do not skip this step.
+
+For each capability the phase intends to deliver, gather evidence in **two** layers and record it in the `## Existing Implementation` section of the plan (see required structure below).
+
+### Layer A — Codebase inventory (always required)
+
+Use [`grep_search`](../../README.md) (and `read_file` on the matches) — not memory — to inventory existing code that touches the phase's surface. For each capability, capture either:
+
+- One or more `path/to/file.ts:LINE` references showing the shipped behavior, **or**
+- An explicit "no existing code found for `<capability>` (searched: `<patterns>`)" line. Negative evidence is still evidence; an unchecked capability is not.
+
+If you discover code that already partially implements a slice, you must say so explicitly and reframe the slice to `wire-up`, `augment`, `audit`, or `drop` (see Slice Kind below) — never silently propose `build` over existing code.
+
+### Layer B — Deployed/runnable surface (when applicable)
+
+If the project has a running surface and you have access to inspect it (browser tools, a local dev server you can curl, a deployed URL), **inspect it before drafting slices**. The whole point of a design plan is to be grounded in observable reality, not speculation.
+
+- **Web/UI projects**: navigate the relevant pages with browser tools (or have the autonomous-builder do so via Explore). Note which UI elements, sections, CTAs, placeholder states, etc. are already rendered. Capture screenshots or DOM excerpts when material.
+- **API/CLI projects**: probe the relevant endpoints/commands. Record the actual response shape and observed behavior.
+- **No deployed/runnable surface available**: write `Layer B: n/a — <one-line reason>` (e.g., "pre-deploy phase, no runnable surface yet"). Do not fabricate.
+
+If you do not have the tools to inspect Layer B yourself but the project clearly has a runnable surface, **return to the autonomous-builder with the inspection request** — the builder dispatches the catalog `designer` agent (browser walkthroughs) or runs API/CLI probes itself, then re-dispatches you with the findings appended to the plan. Do not write `Layer B: n/a` because you personally lack browser tools; that is the failure mode this step exists to prevent. If `designer` is not activated under `.github/agents/`, the builder must surface `/catalog-review activate designer` to the human first.
+
+The [evidence-gathering skill](../../skills/evidence-gathering/SKILL.md) covers the audit patterns (curl/jq, schema dumps, file inventory).
+
 ## Task
 
 Write `roadmap/phases/phase-N-design.md` (where `N` = next phase from CURRENT-STATE). The file **must** contain every section below, in this order.
@@ -33,6 +60,19 @@ draft | in-critique | approved | waived
 
 ## Goal
 One paragraph: what this phase delivers and why.
+
+## Existing Implementation (Reality Check)
+_Required. Output of Phase 0 above. Do not skip; the critic will treat a missing or hand-waved Reality Check as a Blocking finding._
+
+**Layer A — Codebase inventory**
+- **`<capability 1>`**: <file:line evidence | "no existing code found (searched: `<patterns>`)">
+- **`<capability 2>`**: ...
+
+**Layer B — Deployed/runnable surface**
+- **`<surface 1>`**: <observation, with screenshot/excerpt where material | "n/a — <reason>">
+- **`<surface 2>`**: ...
+
+**Implications for slices**: short paragraph mapping what's already shipped to which slices below are `build` vs `wire-up` vs `augment` vs `audit` vs `drop`.
 
 ## User Stories
 _(populated by product-owner handoff; leave as `(to be populated by product-owner)` if not yet invoked)_
@@ -63,9 +103,17 @@ Map each acceptance criterion to a test layer.
 - Manual: ...
 
 ## Slice Breakdown
-Ordered, independently-shippable slices with file-level hints.
-1. **Slice 1 — <name>**: files touched, scope, tests to write.
-2. **Slice 2 — <name>**: ...
+Ordered, independently-shippable slices with file-level hints. Each slice **must** declare a `Kind` and reference the Existing Implementation finding(s) it relies on.
+
+`Kind` vocabulary:
+- **build** — net-new code/UI; Layer A + B confirmed nothing exists.
+- **wire-up** — DOM/scaffolding/data exists but is unwired or stubbed (e.g. "Coming soon" placeholder); slice connects it.
+- **augment** — feature partially shipped; slice extends it (e.g. add per-row link to existing list).
+- **audit** — feature appears shipped; slice verifies consistency/accessibility/edge cases without new build.
+- **drop** — slice was originally proposed but Reality Check revealed it is already shipped; record why so the next round doesn't re-add it.
+
+1. **Slice 1 — <name>** (Kind: <build|wire-up|augment|audit|drop>): files touched, scope, tests to write. Grounded in Existing Implementation: <bullet ref or "no prior code">.
+2. **Slice 2 — <name>** (Kind: ...): ...
 ```
 
 ## After writing
@@ -90,6 +138,7 @@ When the draft is complete, hand off to:
 
 ## Rules
 
+- **Reality first.** Phase 0 is mandatory — slice authoring without a populated `## Existing Implementation` section is a Blocking critic finding, not a stylistic preference. Half-shipped functionality is the most common (and most expensive) design failure mode.
 - Do **not** make implementation decisions here — that's `/implementation-plan`.
 - Flag unresolved blockers in `docs/reference/open-questions.md`; do not paper over them.
 - Do not edit source code. Your scope is plan files + `state.md`.

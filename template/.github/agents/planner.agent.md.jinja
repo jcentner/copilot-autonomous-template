@@ -47,13 +47,17 @@ Consult on demand via Explore: ADRs, architecture overview, open questions, tech
 
 Write `roadmap/phases/phase-N-design.md` with these required sections:
 
-1. **User Stories** — placeholder `(to be populated by product-owner)` if product-owner hasn't been invoked yet; otherwise existing content. The product-owner may legitimately resolve this to `n/a — <reason>` for phases with no user-facing surface (refactors, infra, build/CI).
-2. **Acceptance Criteria** — list at least one measurable outcome per story.
-3. **Non-Goals** — explicit exclusions to prevent scope creep.
-4. **Risks** — what could go wrong, with mitigations.
-5. **ADR Candidates** — decisions that deserve capture in `docs/architecture/decisions/`.
-6. **Test Strategy** — what gets tested at what layer (unit / integration / e2e / manual).
-7. **Slice Breakdown** — ordered list of slices with file-level hints.
+1. **Existing Implementation (Reality Check)** — **mandatory grounding step before authoring slices**. Inventory what's already shipped in two layers:
+   - **Layer A — Codebase**: use `grep_search` + `read_file` (not memory) to find existing code touching the phase's surface. Cite `path/file.ts:LINE`, or write an explicit "no existing code found (searched: `<patterns>`)" line. Negative evidence is still evidence.
+   - **Layer B — Deployed/runnable surface**: when the project has one and you (or a dispatchable subagent) can inspect it (browser tools, dev server, deployed URL), do so. Record what UI/endpoints/CTAs are already rendered or live. **You do not have browser tools yourself** — if Layer B requires a browser walkthrough, return to the autonomous-builder with a list of pages to inspect; the builder dispatches the catalog `designer` agent (or `/design-review`), captures the findings, and re-dispatches you with the augmented plan. Do **not** write `Layer B: n/a` just because you personally cannot observe it; that is the failure mode this whole step exists to prevent. Mark `Layer B: n/a — <reason>` only when there is genuinely no runnable surface yet.
+   - See the [evidence-gathering skill](../skills/evidence-gathering/SKILL.md) for audit patterns.
+2. **User Stories** — placeholder `(to be populated by product-owner)` if product-owner hasn't been invoked yet; otherwise existing content. The product-owner may legitimately resolve this to `n/a — <reason>` for phases with no user-facing surface (refactors, infra, build/CI).
+3. **Acceptance Criteria** — list at least one measurable outcome per story.
+4. **Non-Goals** — explicit exclusions to prevent scope creep.
+5. **Risks** — what could go wrong, with mitigations.
+6. **ADR Candidates** — decisions that deserve capture in `docs/architecture/decisions/`.
+7. **Test Strategy** — what gets tested at what layer (unit / integration / e2e / manual).
+8. **Slice Breakdown** — ordered list of slices with file-level hints. Each slice **must** declare a `Kind` (`build` | `wire-up` | `augment` | `audit` | `drop`) consistent with the Reality Check. Never propose `build` for code or UI Layer A/B already showed exists — reframe as `wire-up` / `augment` / `drop` and cite the evidence.
 
 After writing, update `roadmap/state.md` via the sanctioned helper (direct edits to `state.md` are blocked by `tool-guardrails.py`):
 
@@ -76,9 +80,10 @@ python3 .github/hooks/scripts/write-plan-evidence.py design-status in-critique
 
 Write `roadmap/phases/phase-N-implementation.md` grounded in the approved design:
 
-1. Reference the approved design plan by path.
-2. For each slice: files touched, scope, test strategy, acceptance criteria from the design, estimated ordering dependencies.
-3. Include a **post-implementation checks** section listing what the builder must verify before invoking the reviewer.
+1. Reference the approved design plan by path. Carry forward each slice's `Kind` (`build | wire-up | augment | audit | drop`) — never silently upgrade `wire-up` to `build`.
+2. **Verify codebase anchors before authoring each slice.** Use `grep_search` + `read_file` + `file_search` (not memory) to confirm every `Files touched` path exists at the cited location (or is confirmed not present, for new files), and every named function / class / route / table / endpoint the slice integrates with exists at a specific `path:line`. Record the results in the slice's `Codebase Anchors (verified)` subsection. The critic will spot-check at least one slice; mismatches are Blocking.
+3. For each slice: files touched, scope, test strategy, acceptance criteria from the design, estimated ordering dependencies.
+4. Include a **post-implementation checks** section listing what the builder must verify before invoking the reviewer.
 
 Do **not** start implementation planning unless `Design Status` is `approved` or `waived`.
 
@@ -102,6 +107,8 @@ When product-owner is unavailable (e.g., phase has no user-facing surface), the 
 
 ## Rules
 
+- **Reality first.** Before authoring any design slice, complete the Reality Check (codebase + deployed/runnable surface). A `build` slice over already-shipped code is the failure mode this rule exists to prevent. If you cannot inspect Layer B yourself, request the inspection rather than skipping.
+- **Anchors first (implementation).** Before authoring any implementation slice, verify every `Files touched` path and every named symbol the slice integrates with via `grep_search` / `read_file` / `file_search`. Speculative paths cause executing-stage rework; the critic will spot-check.
 - **Read-only against code.** You search, read, and analyze code but do not write it.
 - **Cite sources.** Reference ADRs, docs, external URLs with links.
 - **Honest about uncertainty.** If research is needed, say so — don't guess.

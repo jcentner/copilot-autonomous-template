@@ -19,10 +19,23 @@ Do not proceed past this gate. The critic's SubagentStop hook protects the desig
 
 ## Required reads
 
-- The design plan referenced in state.md **Design Plan**
+- The design plan referenced in state.md **Design Plan** — including its `## Existing Implementation` section (Block A Reality Check); your slice anchors must be consistent with what was found there.
 - [Architecture overview](../../docs/architecture/overview.md)
 - [Open questions](../../docs/reference/open-questions.md)
 - Relevant ADRs under `docs/architecture/decisions/`
+
+## Phase 0 — Codebase verification (MANDATORY before slice authoring)
+
+The design plan's Reality Check tells you what *exists*. The implementation plan must additionally verify that every file path, function, class, route, table, or endpoint each slice intends to touch is **real and at the location claimed** — or, for new files, **confirmed not present**. Speculative paths are the most common cause of executing-stage rework.
+
+For each slice, before writing it, use `grep_search` + `read_file` + `file_search` (not memory) to confirm:
+
+- Every existing file in `Files touched` is at the cited path. Cite the confirmation.
+- Every new file in `Files touched` is **not** already present. Cite the negative search.
+- Every named function / class / route / table / endpoint / config key the slice integrates with exists at a specific `path:line`. Cite it.
+- Renames or deletions performed by an earlier slice in this same plan are tracked — do not list a path that an earlier slice already moved.
+
+Record the results in each slice's `Codebase Anchors (verified)` subsection (see required structure below). The critic will pick at least one slice and re-run your searches; mismatches are Blocking.
 
 ## Task
 
@@ -47,6 +60,12 @@ For each slice in the design's Slice Breakdown, expand:
 ### Slice M — <name>
 
 - **Files touched**: list with path + verb (create/modify/delete).
+- **Codebase Anchors (verified)**: results of Phase 0 verification for this slice.
+  - Existing files: e.g. `src/components/Foo.tsx — confirmed exists (read_file, 142 lines)`.
+  - New files: e.g. `src/components/Bar.tsx — confirmed not present (file_search)`.
+  - Each named symbol / route / table / endpoint this slice integrates with: cite `path:line` (e.g. `getCommitteeBills() — src/lib/queries.ts:88`).
+  - Cross-reference to the design plan's `## Existing Implementation` finding(s) this slice relies on.
+  - If a Reality Check finding said "already shipped", the slice `Kind` must be `wire-up | augment | audit | drop` — never `build` over existing code. Carry the design's `Kind` forward.
 - **Scope**: one-paragraph summary of what lands in this slice.
 - **Acceptance criteria** (from design): copy the criterion(ia) this slice satisfies.
 - **Test strategy**: unit / integration / e2e / manual, with file paths for test locations.
@@ -84,7 +103,9 @@ Hand off to **critic** for adversarial review (max 2 rounds). On approve, the bu
 
 ## Rules
 
+- **Anchors first.** Every `Files touched` path and every named symbol the slice integrates with must be verified before authoring the slice. Speculative paths are the most common cause of executing-stage rework, and the critic will spot-check.
 - Do not write code. This is a planning artifact.
 - Be specific: vague plans cause slice loops to stall.
 - Order slices by dependency; leaves first.
 - Every acceptance criterion in the design must map to at least one slice.
+- Carry forward the `Kind` from the design plan; never silently upgrade `wire-up` / `augment` to `build`.
