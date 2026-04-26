@@ -32,7 +32,7 @@ Produce **at least 3 candidates**, including at least one that does not appear i
 - **Risk** — biggest unknown; what could derail this?
 - **Vision alignment** — quote the relevant Vision Lock goal/outcome.
 - **External grounding** — does this involve a system without a `docs/reference/<system>.md` doc or `.github/skills/<system>/SKILL.md`? If yes, surface `RECOMMENDED: /research <system>` before approval. If the bootstrap "detected external systems" line listed the system, this is mandatory.
-- **Catalog touch** — does this need a catalog item not yet activated? If yes, surface `RECOMMENDED: /catalog-review`.
+- **Catalog touch** — does this need a catalog item not yet activated? If yes, surface `RECOMMENDED: /catalog-review`. **In particular**: if the candidate is UI-shaped (web app / front-end / page-level work) and `designer` is not activated under `.github/agents/`, surface `RECOMMENDED: /catalog-review activate designer` — the slice loop's runtime check (step 5b) and the planner's Reality Check Layer B both depend on it for browser walkthroughs.
 
 ## Phase C — Present and decide
 

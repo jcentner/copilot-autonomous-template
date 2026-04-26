@@ -119,8 +119,27 @@ to a claim about a system (codebase, runtime, deployed surface).
   hook scripts. No removed prompts or helpers. All changes are contract
   guidance in agent + prompt files plus matching critic/reviewer review
   dimensions.
-- All 7 commits land green: `make test-all` (160 hook tests + smoke +
+- All commits land green: `make test-all` (160 hook tests + smoke +
   contract-drift lint) passes after every block.
+
+### Known limitations (deferred)
+
+- **Slice Kind vocabulary doesn't fit refactor / infra phases
+  cleanly.** `build | wire-up | augment | audit | drop` is
+  user-facing-shaped. Pure refactor ("split God object") or pure
+  CI/infra ("migrate to GitHub Actions") slices have no honest fit;
+  current guidance is to pick the closest Kind and let `Layer B: n/a`
+  + `Runtime check: n/a` carry the reality-check honesty downstream.
+  A future minor may add `refactor` and/or `infra` to the vocab if
+  this proves leaky in practice.
+- **"Hand-waved" judgment in critic Reality grounding.** Block A's
+  critic dimension treats `missing | hand-waved | contradicted` as
+  Blocking. "Missing" and "contradicted" are objective; "hand-waved"
+  is judgment-heavy and could cause inconsistent rounds across
+  critic invocations. Not splitting now — the existing
+  `evidence-status` convention (`present | needed | unmeasurable`)
+  partially handles it. Revisit if rounds-budget exhaustion becomes
+  a recurring failure mode.
 
 ## [1.2.4] — 2026-04-25
 

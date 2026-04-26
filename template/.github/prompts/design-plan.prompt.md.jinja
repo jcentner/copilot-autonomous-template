@@ -42,7 +42,7 @@ If the project has a running surface and you have access to inspect it (browser 
 - **API/CLI projects**: probe the relevant endpoints/commands. Record the actual response shape and observed behavior.
 - **No deployed/runnable surface available**: write `Layer B: n/a — <one-line reason>` (e.g., "pre-deploy phase, no runnable surface yet"). Do not fabricate.
 
-If you do not have the tools to inspect Layer B yourself but the project clearly has a runnable surface, **ask the autonomous-builder (or human) to do the inspection and feed findings back** — do not skip and do not guess. Half-shipped functionality discovered post-design is the failure mode this step exists to prevent.
+If you do not have the tools to inspect Layer B yourself but the project clearly has a runnable surface, **return to the autonomous-builder with the inspection request** — the builder dispatches the catalog `designer` agent (browser walkthroughs) or runs API/CLI probes itself, then re-dispatches you with the findings appended to the plan. Do not write `Layer B: n/a` because you personally lack browser tools; that is the failure mode this step exists to prevent. If `designer` is not activated under `.github/agents/`, the builder must surface `/catalog-review activate designer` to the human first.
 
 The [evidence-gathering skill](../../skills/evidence-gathering/SKILL.md) covers the audit patterns (curl/jq, schema dumps, file inventory).
 

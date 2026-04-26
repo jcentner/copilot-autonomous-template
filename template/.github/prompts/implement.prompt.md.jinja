@@ -30,6 +30,7 @@ Execute every step in order. Do not skip or reorder:
 5. **Run post-implementation checks** from the implementation plan (stale references, config traces, diagram/prose consistency).
 5b. **Runtime check** — for any slice with `Kind: build | wire-up | augment`, produce evidence the change works on the running surface (not just that tests pass):
     - **UI slice**: dispatch the catalog `designer` agent (or `/design-review`) to navigate + screenshot the affected page(s). The autonomous-builder cannot drive browser tools directly.
+      - **If `designer` is not activated**: append `RECOMMEND: /catalog-review activate designer` to the commit body and write `Runtime check: n/a — designer not activated; activating before next UI slice`. Reviewer accepts this once per project; a second consecutive UI slice with no designer is a Major finding.
     - **API slice**: `curl` the affected endpoint(s); capture status + a `jq` excerpt of the response shape.
     - **CLI slice**: invoke the affected command(s); capture stdout/stderr.
     - **Library slice with no observable surface**: write `Runtime check: n/a — <reason ≥20 chars>` (e.g., "internal refactor, no observable behavior change").
